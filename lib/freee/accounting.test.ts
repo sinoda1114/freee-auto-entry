@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createDeal,
   getAccountItems,
+  getPartners,
   getTaxCodes,
   getWalletables,
 } from "./accounting";
@@ -55,6 +56,21 @@ describe("accounting API client", () => {
     expect(items).toEqual([{ id: 1, name: "普通預金" }]);
     const [url] = fetchMock.mock.calls[0];
     expect(url).toContain("/api/1/walletables");
+    expect(url).toContain("company_id=999");
+  });
+
+  it("getPartners fetches business partners for the company", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ partners: [{ id: 1, name: "株式会社サンプル" }] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const items = await getPartners(auth);
+
+    expect(items).toEqual([{ id: 1, name: "株式会社サンプル" }]);
+    const [url] = fetchMock.mock.calls[0];
+    expect(url).toContain("/api/1/partners");
     expect(url).toContain("company_id=999");
   });
 

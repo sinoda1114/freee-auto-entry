@@ -20,6 +20,11 @@ export interface Walletable {
   name: string;
 }
 
+export interface Partner {
+  id: number;
+  name: string;
+}
+
 export interface CreatedDeal {
   id: number;
 }
@@ -70,6 +75,11 @@ export async function getWalletables(auth: FreeeAuth): Promise<Walletable[]> {
     `/walletables?company_id=${auth.companyId}`,
   );
   return data.walletables;
+}
+
+export async function getPartners(auth: FreeeAuth): Promise<Partner[]> {
+  const data = await freeeFetch(auth, `/partners?company_id=${auth.companyId}`);
+  return data.partners;
 }
 
 export async function createDeal(
