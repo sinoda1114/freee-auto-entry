@@ -64,9 +64,17 @@ export async function getAccountItems(auth: FreeeAuth): Promise<AccountItem[]> {
   return data.account_items;
 }
 
+interface RawTaxCode {
+  code: number;
+  name_ja: string;
+  available: boolean;
+}
+
 export async function getTaxCodes(auth: FreeeAuth): Promise<TaxCode[]> {
   const data = await freeeFetch(auth, `/taxes/companies/${auth.companyId}`);
-  return data.taxes;
+  return (data.taxes as RawTaxCode[])
+    .filter((tax) => tax.available)
+    .map((tax) => ({ code: tax.code, name: tax.name_ja }));
 }
 
 export async function getWalletables(auth: FreeeAuth): Promise<Walletable[]> {

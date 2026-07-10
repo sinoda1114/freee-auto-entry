@@ -30,16 +30,31 @@ describe("accounting API client", () => {
     expect(init.headers.Authorization).toBe("Bearer token-abc");
   });
 
-  it("getTaxCodes fetches tax codes for the company", async () => {
+  it("getTaxCodes returns only available tax codes with the Japanese label", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ taxes: [{ code: 1, name: "課税仕入10%" }] }),
+      json: async () => ({
+        taxes: [
+          {
+            code: 136,
+            name: "purchase_with_tax_10",
+            name_ja: "課対仕入10%",
+            available: true,
+          },
+          {
+            code: 1,
+            name: "taxable",
+            name_ja: "課税",
+            available: false,
+          },
+        ],
+      }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
     const items = await getTaxCodes(auth);
 
-    expect(items).toEqual([{ code: 1, name: "課税仕入10%" }]);
+    expect(items).toEqual([{ code: 136, name: "課対仕入10%" }]);
     const [url] = fetchMock.mock.calls[0];
     expect(url).toContain("/api/1/taxes/companies/999");
   });
