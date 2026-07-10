@@ -1,6 +1,6 @@
-# {{PROJECT_NAME}} — プロジェクト指示
+# freee-auto-entry — プロジェクト指示
 
-{{PROJECT_NAME}}（`{{DOMAIN}}`）の AI 向けプロジェクト指示。
+freee-auto-entry（`freee-auto-entry.vercel.app`）の AI 向けプロジェクト指示。
 
 ## 運用ルール（HOW）の正本
 
@@ -15,13 +15,13 @@
 
 | 項目 | 値 |
 |---|---|
-| リポ実体 dir（統合＋デプロイ専用・ここで機能開発しない） | `~/dev/{{REPO_SLUG}}` |
-| GitHub | `{{GH_OWNER_REPO}}` |
-| デプロイ基盤 | {{DEPLOY_PLATFORM}}（git 駆動・feature push = Preview / main マージ = Production） |
-| 本番 URL | {{PROD_URL}} |
-| 独自ドメイン | {{DOMAIN}} |
-| 絶対 URL の env | `{{SITE_URL_ENV}}`（=`https://{{DOMAIN}}`・ハードコード禁止） |
-| タスク正本 | GitHub Issue / Project「{{PROJECT_BOARD}}」 |
+| リポ実体 dir（統合＋デプロイ専用・ここで機能開発しない） | `~/dev/freee` |
+| GitHub | `sinoda1114/freee-auto-entry` |
+| デプロイ基盤 | Vercel（git 駆動・feature push = Preview / main マージ = Production） |
+| 本番 URL | https://freee-auto-entry.vercel.app |
+| 独自ドメイン | freee-auto-entry.vercel.app |
+| 絶対 URL の env | `NEXT_PUBLIC_SITE_URL`（=`https://freee-auto-entry.vercel.app`・ハードコード禁止） |
+| タスク正本 | GitHub Issue / Project「freee-auto-entry Tasks」(#7) |
 
 ## 役割境界（このプロジェクト）
 
@@ -35,9 +35,17 @@
 | 整合監督・レビュー（実装しない） | reviewer |
 -->
 
+## スタック
+
+Next.js（App Router / TypeScript / Tailwind CSS）。`create-next-app` で生成した雛形をベースにしている。
+
+<!-- BEGIN:nextjs-agent-rules -->
+このバージョンの Next.js は訓練データと API・規約・ファイル構成が異なる場合がある。コードを書く前に `node_modules/next/dist/docs/` の該当ガイドを確認し、非推奨通知に従うこと。
+<!-- END:nextjs-agent-rules -->
+
 ## dev 規律
 
 - dev サーバ起動中にビルド成果物を消したり本番ビルドを実行しない（壊れる）。dev は 1 つ。
 - AI 検証は `tsc` / `eslint` / `test` で行う（手動確認をユーザーに丸投げしない）。
-- `.env.local` は触らない・中身を出力しない（本番 env は {{DEPLOY_PLATFORM}} ダッシュボードが正本）。
+- `.env.local` は触らない・中身を出力しない（本番 env は Vercel ダッシュボードが正本）。
 - シークレット（API キー・トークン）はログ / 出力に出さない。必要なら redact する。
