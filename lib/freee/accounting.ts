@@ -1,0 +1,97 @@
+const ACCOUNTING_API_BASE = "https://api.freee.co.jp/api/1";
+
+export interface FreeeAuth {
+  accessToken: string;
+  companyId: string;
+}
+
+export interface AccountItem {
+  id: number;
+  name: string;
+}
+
+export interface TaxCode {
+  code: number;
+  name: string;
+}
+
+export interface Walletable {
+  id: number;
+  name: string;
+}
+
+export interface CreatedDeal {
+  id: number;
+}
+
+export interface CreateDealInput {
+  issueDate: string;
+  accountItemId: number;
+  taxCode: number;
+  amount: number;
+  description: string;
+  memoTagIds?: number[];
+}
+
+async function freeeFetch(auth: FreeeAuth, path: string, init: RequestInit = {}) {
+  const res = await fetch(`${ACCOUNTING_API_BASE}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${auth.accessToken}`,
+      "Content-Type": "application/json",
+      ...init.headers,
+    },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`freee accounting API request failed: ${res.status} ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function getAccountItems(auth: FreeeAuth): Promise<AccountItem[]> {
+  const data = await freeeFetch(
+    auth,
+    `/account_items?company_id=${auth.companyId}`,
+  );
+  return data.account_items;
+}
+
+export async function getTaxCodes(auth: FreeeAuth): Promise<TaxCode[]> {
+  const data = await freeeFetch(auth, `/taxes/companies/${auth.companyId}`);
+  return data.taxes;
+}
+
+export async function getWalletables(auth: FreeeAuth): Promise<Walletable[]> {
+  const data = await freeeFetch(
+    auth,
+    `/walletables?company_id=${auth.companyId}`,
+  );
+  return data.walletables;
+}
+
+export async function createDeal(
+  auth: FreeeAuth,
+  input: CreateDealInput,
+): Promise<CreatedDeal> {
+  const data = await freeeFetch(auth, "/deals", {
+    method: "POST",
+    body: JSON.stringify({
+      company_id: Number(auth.companyId),
+      issue_date: input.issueDate,
+      type: "expense",
+      details: [
+        {
+          account_item_id: input.accountItemId,
+          tax_code: input.taxCode,
+          amount: input.amount,
+          description: input.description,
+          ...(input.memoTagIds ? { tag_ids: input.memoTagIds } : {}),
+        },
+      ],
+    }),
+  });
+  return data.deal;
+}
