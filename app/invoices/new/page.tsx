@@ -30,7 +30,7 @@ export default async function NewInvoicePage() {
         ← トップに戻る
       </Link>
       <h1 className="text-2xl font-semibold">請求書を作成</h1>
-      <InvoiceForm partners={partners} />
+      <InvoiceForm partners={partners} companyId={auth.companyId} />
     </div>
   );
 }

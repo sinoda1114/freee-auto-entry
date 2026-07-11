@@ -16,6 +16,8 @@ coverage/
 # OS / エディタ
 .DS_Store
 *.log
+*.db
+.freee-local.db*
 
 # Next.js / Vercel
 next-env.d.ts

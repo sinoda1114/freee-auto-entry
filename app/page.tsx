@@ -23,7 +23,11 @@ export default async function Home() {
             freeeに接続済みです（事業所: {activeCompany?.companyName ?? session.companyId}）
           </p>
           {companies.length > 0 && (
-            <CompanySwitcher companies={companies} activeCompanyId={activeCompanyId} />
+            <CompanySwitcher
+              key={activeCompanyId}
+              companies={companies}
+              activeCompanyId={activeCompanyId}
+            />
           )}
           <div className="flex gap-4">
             <Link
