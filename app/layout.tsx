@@ -1,22 +1,28 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { BIZ_UDGothic, JetBrains_Mono } from "next/font/google";
+import { APP_DESCRIPTION, APP_NAME } from "@/lib/app-brand";
 import { AppHeader } from "./AppHeader";
+import { HeaderFallback } from "./components/HeaderFallback";
+import { Providers } from "./providers";
 import "./globals.css";
 
 const bizUdGothic = BIZ_UDGothic({
   variable: "--font-biz-ud-gothic",
   subsets: ["latin"],
   weight: ["400", "700"],
+  display: "swap",
 });
 
 const jetBrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "freee経理・請求管理",
-  description: "freeeの未処理明細と定型請求をまとめて管理",
+  title: APP_NAME,
+  description: APP_DESCRIPTION,
 };
 
 export default function RootLayout({
@@ -27,19 +33,24 @@ export default function RootLayout({
   return (
     <html
       lang="ja"
+      suppressHydrationWarning
       className={`${bizUdGothic.variable} ${jetBrainsMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">
-        <a
-          href="#main-content"
-          className="sr-only z-50 rounded bg-white px-4 py-2 text-slate-950 focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
-        >
-          本文へスキップ
-        </a>
-        <AppHeader />
-        <main id="main-content" className="flex-1">
-          {children}
-        </main>
+      <body className="flex min-h-full flex-col bg-[var(--freee-bg)] text-[var(--freee-text)]">
+        <Providers>
+          <a
+            href="#main-content"
+            className="sr-only z-50 rounded bg-[var(--freee-surface)] px-4 py-2 text-[var(--freee-text)] focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+          >
+            本文へスキップ
+          </a>
+          <Suspense fallback={<HeaderFallback />}>
+            <AppHeader />
+          </Suspense>
+          <main id="main-content" className="flex-1">
+            {children}
+          </main>
+        </Providers>
       </body>
     </html>
   );

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getSession } from "@/lib/session";
 import type { FreeeCompanyConnection, SessionData } from "@/lib/session";
 import type { IronSession } from "iron-session";
@@ -82,7 +83,7 @@ async function refreshSessionTokenIfExpired(
   return true;
 }
 
-export async function getValidFreeeAuth(): Promise<FreeeAuth | null> {
+export const getValidFreeeAuth = cache(async (): Promise<FreeeAuth | null> => {
   const session = await getSession();
 
   if (!session.accessToken || !session.companyId) {
@@ -99,7 +100,7 @@ export async function getValidFreeeAuth(): Promise<FreeeAuth | null> {
   }
 
   return { accessToken: session.accessToken, companyId: session.companyId };
-}
+});
 
 /**
  * OAuth認可コールバックで取得したトークンを、事業所ごとの接続一覧に保存し、
@@ -211,16 +212,18 @@ export interface ConnectedCompaniesResult {
 /**
  * UI表示用に、認可済みの事業所一覧(トークンを含まない)とアクティブな事業所IDを返す。
  */
-export async function getConnectedCompanies(): Promise<ConnectedCompaniesResult> {
-  const session = await getSession();
-  const companies = withLegacyConnectionMigrated(session);
+export const getConnectedCompanies = cache(
+  async (): Promise<ConnectedCompaniesResult> => {
+    const session = await getSession();
+    const companies = withLegacyConnectionMigrated(session);
 
-  return {
-    companies: companies.map((c) => ({
-      companyId: String(c.companyId),
-      companyName: c.companyName,
-    })),
-    activeCompanyId:
-      session.companyId === undefined ? undefined : String(session.companyId),
-  };
-}
+    return {
+      companies: companies.map((c) => ({
+        companyId: String(c.companyId),
+        companyName: c.companyName,
+      })),
+      activeCompanyId:
+        session.companyId === undefined ? undefined : String(session.companyId),
+    };
+  },
+);

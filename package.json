@@ -7,12 +7,17 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "postinstall": "node scripts/link-typescript6-for-eslint.mjs"
   },
   "dependencies": {
+    "@heroui/react": "^2.8.5",
     "@libsql/client": "0.17.4",
+    "framer-motion": "^12.23.24",
     "iron-session": "8.0.4",
-    "next": "16.2.10",
+    "next": "16.3.0-canary.83",
+    "next-themes": "^0.4.6",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
@@ -21,15 +26,16 @@
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "6.0.3",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.3.0-canary.83",
     "jsdom": "29.1.1",
     "tailwindcss": "^4",
-    "typescript": "^5",
+    "typescript": "7.0.2",
+    "typescript-6-eslint": "npm:typescript@6.0.3",
     "vitest": "4.1.10"
   }
 }

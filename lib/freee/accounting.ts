@@ -8,6 +8,7 @@ export interface FreeeAuth {
 export interface AccountItem {
   id: number;
   name: string;
+  defaultTaxCode: number;
 }
 
 export interface TaxCode {
@@ -61,7 +62,25 @@ export async function getAccountItems(auth: FreeeAuth): Promise<AccountItem[]> {
     auth,
     `/account_items?company_id=${auth.companyId}`,
   );
-  return data.account_items;
+  return (data.account_items as Array<Record<string, unknown>>)
+    .filter((item) => item.available !== false)
+    .map((item) => ({
+      id: Number(item.id),
+      name: String(item.name),
+      defaultTaxCode: Number(item.default_tax_code),
+    }));
+}
+
+export function resolveTaxNameForAccountItem(
+  accountItemName: string,
+  accountItems: AccountItem[],
+  taxCodes: TaxCode[],
+): string | undefined {
+  const accountItem = accountItems.find((item) => item.name === accountItemName);
+  if (!accountItem) {
+    return undefined;
+  }
+  return taxCodes.find((tax) => tax.code === accountItem.defaultTaxCode)?.name;
 }
 
 interface RawTaxCode {

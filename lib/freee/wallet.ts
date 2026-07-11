@@ -187,15 +187,17 @@ export async function getWalletTransactions(
 
 export async function getUserMatchers(
   auth: FreeeAuth,
-  pagination: { offset: number; limit: number },
+  pagination: { offset: number; limit: number; act?: number },
 ): Promise<UserMatcher[]> {
   const params = new URLSearchParams({
     company_id: auth.companyId,
     offset: String(pagination.offset),
     limit: String(pagination.limit),
     active: "active",
-    act: "1",
   });
+  if (pagination.act !== undefined) {
+    params.set("act", String(pagination.act));
+  }
   const data = await freeeFetch(auth, `/user_matchers?${params}`);
   if (!isRecord(data) || !Array.isArray(data.data)) {
     throw new Error("freee user matchers response is invalid");
@@ -230,7 +232,35 @@ export async function createUserMatcher(
   return { id: data.id };
 }
 
-function descriptionMatches(
+const SUGGESTION_MATCHER_ACTS = [0, 1] as const;
+
+export async function getAllUserMatchersForActs(
+  auth: FreeeAuth,
+  acts: readonly number[] = SUGGESTION_MATCHER_ACTS,
+  pageSize = 100,
+): Promise<UserMatcher[]> {
+  const matchers: UserMatcher[] = [];
+  for (const act of acts) {
+    for (let offset = 0; ; offset += pageSize) {
+      const page = await getUserMatchers(auth, { offset, limit: pageSize, act });
+      matchers.push(...page);
+      if (page.length < pageSize) {
+        break;
+      }
+    }
+  }
+
+  const seen = new Set<number>();
+  return matchers.filter((matcher) => {
+    if (seen.has(matcher.id)) {
+      return false;
+    }
+    seen.add(matcher.id);
+    return true;
+  });
+}
+
+export function descriptionMatches(
   value: string,
   expected: string,
   condition: MatcherCondition,

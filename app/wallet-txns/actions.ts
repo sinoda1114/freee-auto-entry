@@ -90,7 +90,7 @@ export async function createMatcherAction(
   ) {
     return {
       status: "error",
-      message: "ルール内容と恒久適用の確認を入力してください。",
+      message: "自動登録ルールの内容と確認にチェックを入れてください。",
     };
   }
 

@@ -11,6 +11,7 @@ const recordInvoiceGenerationMock = vi.fn();
 const saveInvoiceGenerationClaimResultMock = vi.fn();
 const releaseInvoiceGenerationClaimMock = vi.fn();
 const getAppMemoTagIdMock = vi.fn();
+const deleteRecurringInvoiceTemplateMock = vi.fn();
 
 vi.mock("@/lib/freee/session-client", () => ({
   getValidFreeeAuth: () => getValidFreeeAuthMock(),
@@ -22,6 +23,8 @@ vi.mock("@/lib/db/recurring-invoices", () => ({
   createRecurringInvoiceTemplate: vi.fn(),
   updateRecurringInvoiceTemplate: vi.fn(),
   setRecurringInvoiceTemplateActive: vi.fn(),
+  deleteRecurringInvoiceTemplate: (...args: unknown[]) =>
+    deleteRecurringInvoiceTemplateMock(...args),
   getRecurringInvoiceTemplate: (...args: unknown[]) =>
     getTemplateMock(...args),
   claimInvoiceGeneration: (...args: unknown[]) =>
@@ -51,6 +54,7 @@ vi.mock("@/lib/freee/memo-tag", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import {
+  deleteTemplateAction,
   generateRecurringInvoiceAction,
   saveTemplateAction,
 } from "./actions";
@@ -73,6 +77,22 @@ describe("recurring invoice actions", () => {
     const result = await saveTemplateAction({ status: "idle" }, formData);
 
     expect(result.status).toBe("error");
+  });
+
+  it("deletes a template for the active company", async () => {
+    deleteRecurringInvoiceTemplateMock.mockResolvedValue(undefined);
+    const formData = new FormData();
+    formData.set("companyId", "11122591");
+    formData.set("templateId", "template-1");
+
+    const result = await deleteTemplateAction({ status: "idle" }, formData);
+
+    expect(result.status).toBe("success");
+    expect(deleteRecurringInvoiceTemplateMock).toHaveBeenCalledWith(
+      expect.anything(),
+      "11122591",
+      "template-1",
+    );
   });
 
   it("warns before creating the same template for the same month twice", async () => {

@@ -21,6 +21,6 @@ export async function switchCompanyAction(
     return { status: result.reason };
   }
 
-  revalidatePath("/");
+  revalidatePath("/", "layout");
   return { status: "switched" };
 }

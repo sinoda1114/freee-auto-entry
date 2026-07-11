@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   claimInvoiceGeneration,
   createRecurringInvoiceTemplate,
+  deleteRecurringInvoiceTemplate,
   getInvoiceGenerationClaimResult,
   getRecordedInvoiceGeneration,
   getRecurringInvoiceTemplate,
@@ -117,6 +118,18 @@ function parseLines(formData: FormData): InvoiceTemplateLine[] | null {
   }));
 }
 
+function parseInvoiceTemplateId(formData: FormData): number | null | undefined {
+  const raw = String(formData.get("invoiceTemplateId") ?? "").trim();
+  if (!raw) {
+    return null;
+  }
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return undefined;
+  }
+  return parsed;
+}
+
 export async function saveTemplateAction(
   _previousState: TemplateActionState,
   formData: FormData,
@@ -143,11 +156,13 @@ export async function saveTemplateAction(
     String(formData.get("sendingMethod") ?? ""),
   );
   const lines = parseLines(formData);
+  const invoiceTemplateId = parseInvoiceTemplateId(formData);
   if (
     !name ||
     !partner ||
     !sendingMethod ||
     !lines ||
+    invoiceTemplateId === undefined ||
     (emailTo && !EMAIL_PATTERN.test(emailTo)) ||
     emailCc === null
   ) {
@@ -170,6 +185,7 @@ export async function saveTemplateAction(
         emailTo,
         emailCc,
         sendingMethod,
+        invoiceTemplateId,
         lines,
       });
     } else {
@@ -182,6 +198,7 @@ export async function saveTemplateAction(
         emailTo,
         emailCc,
         sendingMethod,
+        invoiceTemplateId,
         lines,
       });
     }
@@ -239,6 +256,41 @@ export async function toggleTemplateAction(
       status: "error",
       message:
         error instanceof Error ? error.message : "状態を変更できませんでした。",
+    };
+  }
+}
+
+export async function deleteTemplateAction(
+  _previousState: TemplateActionState,
+  formData: FormData,
+): Promise<TemplateActionState> {
+  const auth = await getValidFreeeAuth();
+  if (
+    !auth ||
+    String(formData.get("companyId") ?? "") !== auth.companyId
+  ) {
+    return {
+      status: "error",
+      message: "事業所を確認して、もう一度操作してください。",
+    };
+  }
+  const templateId = String(formData.get("templateId") ?? "");
+  if (!templateId) {
+    return { status: "error", message: "定型請求が見つかりません。" };
+  }
+  try {
+    await deleteRecurringInvoiceTemplate(
+      getDatabase(),
+      auth.companyId,
+      templateId,
+    );
+    revalidatePath("/recurring-invoices");
+    return { status: "success", message: "定型請求を削除しました。" };
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof Error ? error.message : "削除できませんでした。",
     };
   }
 }
@@ -356,6 +408,9 @@ export async function generateRecurringInvoiceAction(
         emailTo,
         emailCc,
         sendingMethod: template.sendingMethod,
+        ...(template.invoiceTemplateId
+          ? { templateId: template.invoiceTemplateId }
+          : {}),
         lines,
         memoTagIds: [memoTagId],
       });

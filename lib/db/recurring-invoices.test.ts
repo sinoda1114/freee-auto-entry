@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Database, SqlRow } from "./types";
 import {
   createRecurringInvoiceTemplate,
+  deleteRecurringInvoiceTemplate,
   hasInvoiceGeneration,
   listRecurringInvoiceTemplates,
   recordInvoiceGeneration,
@@ -22,6 +23,7 @@ const templateInput = {
   emailTo: "billing@example.com",
   emailCc: "",
   sendingMethod: "email" as const,
+  invoiceTemplateId: null,
   lines: [{ description: "月次保守", quantity: 1, unitPrice: 100000, taxRate: 10 }],
 };
 
@@ -97,6 +99,27 @@ describe("recurring invoice repository", () => {
         templateId: "template-1",
         targetMonth: "2026-07",
       },
+    );
+  });
+
+  it("deletes a template and related generation records", async () => {
+    const db = createDatabaseMock();
+    db.execute = vi.fn(async (sql: string) => {
+      if (sql.includes("DELETE FROM recurring_invoice_templates")) {
+        return { rows: [], rowsAffected: 1 };
+      }
+      return { rows: [], rowsAffected: 0 };
+    });
+
+    await deleteRecurringInvoiceTemplate(db, "11122591", "template-1");
+
+    expect(db.execute).toHaveBeenCalledWith(
+      expect.stringContaining("DELETE FROM invoice_generation_history"),
+      { companyId: "11122591", templateId: "template-1" },
+    );
+    expect(db.execute).toHaveBeenCalledWith(
+      expect.stringContaining("DELETE FROM recurring_invoice_templates"),
+      { companyId: "11122591", templateId: "template-1" },
     );
   });
 });

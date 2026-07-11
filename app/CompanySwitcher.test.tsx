@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen } from "@/test/test-utils";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CompanySwitcher } from "./CompanySwitcher";
@@ -14,6 +14,13 @@ const companies = [
   { companyId: "222", companyName: "Company Two" },
 ];
 
+async function selectCompany(name: string) {
+  const user = userEvent.setup();
+  const trigger = screen.getByLabelText("事業所を切り替え");
+  await user.click(trigger);
+  await user.click(await screen.findByRole("option", { name }));
+}
+
 describe("CompanySwitcher", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -26,37 +33,34 @@ describe("CompanySwitcher", () => {
         resolveAction = resolve;
       }),
     );
-    const user = userEvent.setup();
     render(
       <CompanySwitcher companies={companies} activeCompanyId="111" />,
     );
 
-    const selector = screen.getByRole("combobox", {
-      name: "事業所を切り替え:",
-    });
-    const selection = user.selectOptions(selector, "222");
+    const trigger = screen.getByLabelText("事業所を切り替え");
+    const selection = selectCompany("Company Two");
 
-    await vi.waitFor(() => expect(selector).toBeDisabled());
+    await vi.waitFor(() => expect(trigger).toHaveAttribute("data-disabled", "true"));
     resolveAction?.({ status: "switched" });
     await selection;
-    await vi.waitFor(() => expect(selector).toBeEnabled());
+    await vi.waitFor(() =>
+      expect(trigger).not.toHaveAttribute("data-disabled", "true"),
+    );
   });
 
   it("restores the active company and shows an error when switching fails", async () => {
     switchCompanyActionMock.mockResolvedValue({ status: "not-connected" });
-    const user = userEvent.setup();
     render(
       <CompanySwitcher companies={companies} activeCompanyId="111" />,
     );
 
-    const selector = screen.getByRole("combobox", {
-      name: "事業所を切り替え:",
-    });
-    await user.selectOptions(selector, "222");
+    await selectCompany("Company Two");
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "事業所を切り替えられませんでした",
     );
-    expect(selector).toHaveValue("111");
+    expect(screen.getByLabelText("事業所を切り替え")).toHaveTextContent(
+      "Company One",
+    );
   });
 });

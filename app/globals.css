@@ -1,26 +1,156 @@
 @import "tailwindcss";
+@plugin "../hero.ts";
+@source "../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  color-scheme: light;
+  --freee-blue: #2864f0;
+  --freee-blue-dark: #1e4fc4;
+  --freee-bg: #f5f7fa;
+  --freee-surface: #ffffff;
+  --freee-text: #333333;
+  --freee-text-muted: #666666;
+  --freee-border: #e2e6eb;
+  --freee-hero-from: #2864f0;
+  --freee-hero-via: #2458d6;
+  --freee-hero-to: #1a4ab8;
+  --background: var(--freee-bg);
+  --foreground: var(--freee-text);
+  --radius-panel: 8px;
+}
+
+.dark {
+  color-scheme: dark;
+  --freee-blue: #5b8df7;
+  --freee-blue-dark: #2864f0;
+  --freee-bg: #0f1419;
+  --freee-surface: #1a2332;
+  --freee-text: #e8eaed;
+  --freee-text-muted: #9aa0a6;
+  --freee-border: #2d3a4d;
+  --freee-hero-from: #1e4fc4;
+  --freee-hero-via: #183c90;
+  --freee-hero-to: #102860;
+  --background: var(--freee-bg);
+  --foreground: var(--freee-text);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-freee-blue: var(--freee-blue);
+  --color-freee-surface: var(--freee-surface);
   --font-sans: var(--font-biz-ud-gothic);
   --font-mono: var(--font-jetbrains-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --text-xs: 0.6875rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.25rem;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background:
+    radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--freee-blue) 6%, transparent), transparent 40%),
+    radial-gradient(circle at 92% 8%, color-mix(in srgb, var(--freee-blue) 4%, transparent), transparent 35%),
+    var(--freee-bg);
+  color: var(--freee-text);
   font-family: var(--font-biz-ud-gothic), sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  min-height: 100vh;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+@layer components {
+  .panel {
+    border-radius: var(--radius-panel);
+    border: 1px solid var(--freee-border);
+    background: var(--freee-surface);
+  }
+
+  .page-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.35;
+    color: var(--freee-text);
+  }
+
+  @media (min-width: 640px) {
+    .page-title {
+      font-size: 1.25rem;
+    }
+  }
+
+  .section-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--freee-blue);
+  }
+
+  .stat-value {
+    font-family: var(--font-jetbrains-mono);
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .form-label {
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--freee-text);
+  }
+
+  .form-input {
+    width: 100%;
+    border-radius: 6px;
+    border: 1px solid var(--freee-border);
+    background: var(--freee-bg);
+    color: var(--freee-text);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25;
+  }
+
+  .form-input::placeholder {
+    color: var(--freee-text-muted);
+  }
+
+  .form-input:focus-visible {
+    border-color: var(--freee-blue);
+    outline: 2px solid color-mix(in srgb, var(--freee-blue) 35%, transparent);
+    outline-offset: 0;
+  }
+
+  .form-line-row {
+    display: grid;
+    gap: 0.75rem;
+    border-radius: var(--radius-panel);
+    border: 1px solid var(--freee-border);
+    background: color-mix(in srgb, var(--freee-bg) 55%, transparent);
+    padding: 0.75rem 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .form-line-row--wide {
+      grid-template-columns: 1fr 7rem 9rem 7rem auto;
+    }
+
+    .form-line-row--compact {
+      grid-template-columns: 1fr 7rem 9rem 7rem;
+    }
+  }
+
+  .form-section-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--freee-text);
+  }
 }

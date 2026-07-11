@@ -5,6 +5,7 @@ import {
   getPartners,
   getTaxCodes,
   getWalletables,
+  resolveTaxNameForAccountItem,
 } from "./accounting";
 
 const auth = { accessToken: "token-abc", companyId: "999" };
@@ -17,17 +18,30 @@ describe("accounting API client", () => {
   it("getAccountItems fetches account items for the company", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ account_items: [{ id: 1, name: "消耗品費" }] }),
+      json: async () => ({
+        account_items: [
+          { id: 1, name: "消耗品費", default_tax_code: 136, available: true },
+        ],
+      }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
     const items = await getAccountItems(auth);
 
-    expect(items).toEqual([{ id: 1, name: "消耗品費" }]);
+    expect(items).toEqual([{ id: 1, name: "消耗品費", defaultTaxCode: 136 }]);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain("/api/1/account_items");
     expect(url).toContain("company_id=999");
     expect(init.headers.Authorization).toBe("Bearer token-abc");
+  });
+
+  it("resolveTaxNameForAccountItem maps default tax code to the Japanese label", () => {
+    const items = [{ id: 1, name: "通信費", defaultTaxCode: 136 }];
+    const taxes = [{ code: 136, name: "課対仕入10%" }];
+
+    expect(resolveTaxNameForAccountItem("通信費", items, taxes)).toBe(
+      "課対仕入10%",
+    );
   });
 
   it("getTaxCodes returns only available tax codes with the Japanese label", async () => {

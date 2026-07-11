@@ -1,10 +1,17 @@
-import { render, screen } from "@testing-library/react";
+import { Navbar, NavbarContent } from "@heroui/react";
+import { render, screen } from "@/test/test-utils";
 import { describe, expect, it } from "vitest";
-import { AppHeader } from "./AppHeader";
+import { HeaderNav } from "./HeaderNav";
 
 describe("AppHeader", () => {
   it("links to the core accounting and invoice workflows", () => {
-    render(<AppHeader />);
+    render(
+      <Navbar>
+        <NavbarContent>
+          <HeaderNav />
+        </NavbarContent>
+      </Navbar>,
+    );
 
     expect(screen.getByRole("link", { name: "未処理明細" })).toHaveAttribute(
       "href",

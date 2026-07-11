@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PageHeader } from "@/app/components/PageHeader";
+import { PageShell } from "@/app/components/PageShell";
 import { getRecurringInvoiceTemplate } from "@/lib/db/recurring-invoices";
 import { getDatabase } from "@/lib/db/turso";
 import { getPartners } from "@/lib/freee/accounting";
+import { getInvoiceTemplates } from "@/lib/freee/invoice";
 import { getValidFreeeAuth } from "@/lib/freee/session-client";
 import { TemplateForm } from "../../TemplateForm";
 
@@ -16,30 +19,32 @@ export default async function EditRecurringInvoicePage({
     return <p className="p-10 text-center">freeeへ再連携してください。</p>;
   }
   const { id } = await params;
-  const [template, partners] = await Promise.all([
+  const [template, partners, invoiceTemplates] = await Promise.all([
     getRecurringInvoiceTemplate(getDatabase(), auth.companyId, id),
     getPartners(auth),
+    getInvoiceTemplates(auth).catch(() => []),
   ]);
   if (!template) {
     notFound();
   }
 
   return (
-    <section className="mx-auto max-w-4xl px-6 py-10">
+    <PageShell width="lg">
       <Link
         href="/recurring-invoices"
-        className="text-sm font-bold text-slate-500 hover:text-lime-700"
+        className="mb-4 inline-block text-sm text-[var(--freee-text-muted)] hover:text-[var(--freee-blue)]"
       >
         ← 定型請求へ戻る
       </Link>
-      <h1 className="mt-4 text-3xl font-black">定型請求を編集</h1>
-      <div className="mt-8">
+      <PageHeader title="定型請求を編集" />
+      <div className="panel mt-4 px-4 py-4">
         <TemplateForm
           companyId={auth.companyId}
           partners={partners}
+          invoiceTemplates={invoiceTemplates}
           template={template}
         />
       </div>
-    </section>
+    </PageShell>
   );
 }

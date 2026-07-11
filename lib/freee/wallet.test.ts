@@ -106,7 +106,7 @@ describe("wallet transactions", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await getUserMatchers(auth, { offset: 0, limit: 100 });
+    await getUserMatchers(auth, { offset: 0, limit: 100, act: 1 });
 
     expect(fetchMock.mock.calls[0]?.[0]).toContain("active=active&act=1");
   });

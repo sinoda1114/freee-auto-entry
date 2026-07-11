@@ -43,6 +43,7 @@ const schemaStatements = [
   `ALTER TABLE invoice_generation_locks ADD COLUMN report_url TEXT`,
   `ALTER TABLE invoice_generation_locks ADD COLUMN external_started_at TEXT`,
   `ALTER TABLE invoice_generation_locks ADD COLUMN claim_token TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE recurring_invoice_templates ADD COLUMN invoice_template_id INTEGER`,
   `CREATE TABLE IF NOT EXISTS matcher_creation_locks (
     company_id TEXT NOT NULL,
     rule_key TEXT NOT NULL,

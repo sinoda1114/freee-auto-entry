@@ -24,6 +24,7 @@ export interface RecurringInvoiceTemplate {
   emailTo: string;
   emailCc: string;
   sendingMethod: InvoiceSendingMethod;
+  invoiceTemplateId: number | null;
   lines: InvoiceTemplateLine[];
   active: boolean;
   createdAt: string;
@@ -38,6 +39,11 @@ export type CreateRecurringInvoiceTemplateInput = Omit<
 export type UpdateRecurringInvoiceTemplateInput = Omit<
   RecurringInvoiceTemplate,
   "companyId" | "active" | "createdAt" | "updatedAt"
+>;
+
+export type RecurringInvoiceTemplatePrefill = Omit<
+  CreateRecurringInvoiceTemplateInput,
+  "companyId"
 >;
 
 function readString(row: SqlRow, key: string): string {
@@ -91,6 +97,17 @@ function parseSendingMethod(value: string): InvoiceSendingMethod {
   throw new Error("Stored sending method is invalid");
 }
 
+function readOptionalNumber(row: SqlRow, key: string): number | null {
+  const value = row[key];
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === "number" || typeof value === "bigint") {
+    return Number(value);
+  }
+  return null;
+}
+
 function parseTemplate(row: SqlRow): RecurringInvoiceTemplate {
   return {
     id: readString(row, "id"),
@@ -102,6 +119,7 @@ function parseTemplate(row: SqlRow): RecurringInvoiceTemplate {
     emailTo: readString(row, "email_to"),
     emailCc: readString(row, "email_cc"),
     sendingMethod: parseSendingMethod(readString(row, "sending_method")),
+    invoiceTemplateId: readOptionalNumber(row, "invoice_template_id"),
     lines: parseLines(readString(row, "lines_json")),
     active: readNumber(row, "active") === 1,
     createdAt: readString(row, "created_at"),
@@ -126,10 +144,10 @@ export async function createRecurringInvoiceTemplate(
   await db.execute(
     `INSERT INTO recurring_invoice_templates (
       id, company_id, name, partner_id, partner_name, subject, email_to,
-      email_cc, sending_method, lines_json, active, created_at, updated_at
+      email_cc, sending_method, invoice_template_id, lines_json, active, created_at, updated_at
     ) VALUES (
       :id, :companyId, :name, :partnerId, :partnerName, :subject, :emailTo,
-      :emailCc, :sendingMethod, :linesJson, 1, :createdAt, :updatedAt
+      :emailCc, :sendingMethod, :invoiceTemplateId, :linesJson, 1, :createdAt, :updatedAt
     )`,
     {
       id: template.id,
@@ -141,6 +159,7 @@ export async function createRecurringInvoiceTemplate(
       emailTo: template.emailTo,
       emailCc: template.emailCc,
       sendingMethod: template.sendingMethod,
+      invoiceTemplateId: template.invoiceTemplateId,
       linesJson: JSON.stringify(template.lines),
       createdAt: template.createdAt,
       updatedAt: template.updatedAt,
@@ -189,8 +208,8 @@ export async function updateRecurringInvoiceTemplate(
     `UPDATE recurring_invoice_templates SET
       name = :name, partner_id = :partnerId, partner_name = :partnerName,
       subject = :subject, email_to = :emailTo, email_cc = :emailCc,
-      sending_method = :sendingMethod, lines_json = :linesJson,
-      updated_at = :updatedAt
+      sending_method = :sendingMethod, invoice_template_id = :invoiceTemplateId,
+      lines_json = :linesJson, updated_at = :updatedAt
     WHERE company_id = :companyId AND id = :id`,
     {
       companyId,
@@ -202,6 +221,7 @@ export async function updateRecurringInvoiceTemplate(
       emailTo: input.emailTo,
       emailCc: input.emailCc,
       sendingMethod: input.sendingMethod,
+      invoiceTemplateId: input.invoiceTemplateId,
       linesJson: JSON.stringify(input.lines),
       updatedAt: new Date().toISOString(),
     },
@@ -231,6 +251,32 @@ export async function setRecurringInvoiceTemplateActive(
   );
   if (result.rowsAffected !== 1) {
     throw new Error("状態を変更する定型請求が見つかりません。");
+  }
+}
+
+export async function deleteRecurringInvoiceTemplate(
+  db: Database,
+  companyId: string,
+  templateId: string,
+): Promise<void> {
+  await ensureDatabaseSchema(db);
+  await db.execute(
+    `DELETE FROM invoice_generation_history
+      WHERE company_id = :companyId AND template_id = :templateId`,
+    { companyId, templateId },
+  );
+  await db.execute(
+    `DELETE FROM invoice_generation_locks
+      WHERE company_id = :companyId AND template_id = :templateId`,
+    { companyId, templateId },
+  );
+  const result = await db.execute(
+    `DELETE FROM recurring_invoice_templates
+      WHERE company_id = :companyId AND id = :templateId`,
+    { companyId, templateId },
+  );
+  if (result.rowsAffected !== 1) {
+    throw new Error("削除する定型請求が見つかりません。");
   }
 }
 

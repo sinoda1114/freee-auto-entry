@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@heroui/react";
 import { useActionState, useState } from "react";
 import type {
   InvoiceTemplateLine,
@@ -29,77 +30,71 @@ export function GenerateInvoiceForm({
   const currentMonth = formatTokyoMonth();
 
   return (
-    <form
-      action={formAction}
-      className="grid gap-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950"
-    >
+    <form action={formAction} className="grid gap-5">
       <input type="hidden" name="companyId" value={companyId} />
       <input type="hidden" name="templateId" value={template.id} />
 
       <div className="grid gap-4 md:grid-cols-3">
-        <label className="grid gap-1 text-sm font-semibold">
+        <label className="form-label">
           対象月
           <input
             type="month"
             name="targetMonth"
             defaultValue={currentMonth}
             required
-            className="rounded-md border border-slate-300 bg-transparent px-3 py-2 dark:border-slate-700"
+            className="form-input"
           />
         </label>
-        <label className="grid gap-1 text-sm font-semibold">
+        <label className="form-label">
           請求日
           <input
             type="date"
             name="billingDate"
             defaultValue={today}
             required
-            className="rounded-md border border-slate-300 bg-transparent px-3 py-2 dark:border-slate-700"
+            className="form-input"
           />
         </label>
-        <label className="grid gap-1 text-sm font-semibold">
+        <label className="form-label">
           入金期日
           <input
             type="date"
             name="paymentDate"
-            className="rounded-md border border-slate-300 bg-transparent px-3 py-2 dark:border-slate-700"
+            className="form-input"
           />
         </label>
-        <label className="grid gap-1 text-sm font-semibold md:col-span-3">
+        <label className="form-label md:col-span-3">
           件名
           <input
             name="subject"
             defaultValue={template.subject}
-            className="rounded-md border border-slate-300 bg-transparent px-3 py-2 dark:border-slate-700"
+            className="form-input"
           />
         </label>
-        <label className="grid gap-1 text-sm font-semibold">
+        <label className="form-label">
           送付先 TO
           <input
             name="emailTo"
             type="email"
             defaultValue={template.emailTo}
-            className="rounded-md border border-slate-300 bg-transparent px-3 py-2 dark:border-slate-700"
+            className="form-input"
           />
         </label>
-        <label className="grid gap-1 text-sm font-semibold">
+        <label className="form-label">
           送付先 CC
           <input
             name="emailCc"
             defaultValue={template.emailCc}
-            className="rounded-md border border-slate-300 bg-transparent px-3 py-2 dark:border-slate-700"
+            className="form-input"
           />
         </label>
       </div>
 
       <fieldset className="grid gap-3">
-        <legend className="text-lg font-black">今回の請求明細</legend>
+        <legend className="form-section-title">今回の請求明細</legend>
         {lines.map((line, index) => (
-          <div
-            key={index}
-            className="grid gap-3 rounded-lg bg-slate-50 p-4 md:grid-cols-[1fr_7rem_9rem_7rem] dark:bg-slate-900"
-          >
-            <label className="grid gap-1 text-xs font-bold">
+          <div key={index} className="form-line-row form-line-row--compact">
+            <label className="form-label text-xs">
               摘要
               <input
                 name="lineDescription"
@@ -114,10 +109,10 @@ export function GenerateInvoiceForm({
                   )
                 }
                 required
-                className="rounded border border-slate-300 bg-white px-2 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="form-input"
               />
             </label>
-            <label className="grid gap-1 text-xs font-bold">
+            <label className="form-label text-xs">
               数量
               <input
                 type="number"
@@ -133,10 +128,10 @@ export function GenerateInvoiceForm({
                     ),
                   )
                 }
-                className="rounded border border-slate-300 bg-white px-2 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="form-input"
               />
             </label>
-            <label className="grid gap-1 text-xs font-bold">
+            <label className="form-label text-xs">
               単価
               <input
                 type="number"
@@ -151,10 +146,10 @@ export function GenerateInvoiceForm({
                     ),
                   )
                 }
-                className="rounded border border-slate-300 bg-white px-2 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="form-input"
               />
             </label>
-            <label className="grid gap-1 text-xs font-bold">
+            <label className="form-label text-xs">
               税率
               <select
                 name="lineTaxRate"
@@ -168,7 +163,7 @@ export function GenerateInvoiceForm({
                     ),
                   )
                 }
-                className="rounded border border-slate-300 bg-white px-2 py-2 dark:border-slate-700 dark:bg-slate-950"
+                className="form-input"
               >
                 <option value="10">10%</option>
                 <option value="8">8%</option>
@@ -179,31 +174,28 @@ export function GenerateInvoiceForm({
         ))}
       </fieldset>
 
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
-        <label className="flex items-start gap-2 font-semibold">
+      <div className="rounded-[var(--radius-panel)] border border-warning-300 bg-warning-50 px-3 py-3 text-sm text-warning-900 dark:border-warning-700 dark:bg-warning-950/40 dark:text-warning-100">
+        <label className="flex items-start gap-2 font-medium">
           <input
             type="checkbox"
             name="confirmed"
             required
-            className="mt-1 size-4 accent-lime-600"
+            className="mt-0.5 size-4 accent-[var(--freee-blue)]"
           />
-          上記内容でfreeeに請求書を作成します。メール送信は行われず、送付はfreee画面で行います。
+          上記内容で freee に請求書を作成します。メール送信は行われず、送付は freee
+          画面で行います。
         </label>
       </div>
-      <button
-        type="submit"
-        disabled={isPending}
-        className="rounded-md bg-lime-500 px-5 py-3 font-black text-slate-950 hover:bg-lime-400 disabled:opacity-50"
-      >
-        {isPending ? "作成中..." : "確認して請求書を作成"}
-      </button>
+      <Button type="submit" color="primary" isLoading={isPending}>
+        確認して請求書を作成
+      </Button>
       {state.message && (
         <div
           role={state.status === "error" ? "alert" : "status"}
-          className={`rounded-lg p-4 ${
+          className={`rounded-[var(--radius-panel)] px-3 py-3 text-sm ${
             state.status === "success"
-              ? "bg-green-50 text-green-800"
-              : "bg-amber-50 text-amber-900"
+              ? "bg-success-50 text-success-800 dark:bg-success-950/40 dark:text-success-100"
+              : "bg-warning-50 text-warning-900 dark:bg-warning-950/40 dark:text-warning-100"
           }`}
         >
           <p>{state.message}</p>
@@ -212,9 +204,9 @@ export function GenerateInvoiceForm({
               href={state.reportUrl}
               target="_blank"
               rel="noreferrer"
-              className="mt-2 inline-block font-bold underline"
+              className="mt-2 inline-block font-semibold text-[var(--freee-blue)] underline"
             >
-              freeeで確認・送付する ↗
+              freee で確認・送付する ↗
             </a>
           )}
         </div>
