@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { switchCompanyAction } from "./company-actions";
 
 export interface CompanyOption {
@@ -19,10 +19,6 @@ export function CompanySwitcher({ companies, activeCompanyId }: CompanySwitcherP
     activeCompanyId ?? "",
   );
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSelectedCompanyId(activeCompanyId ?? "");
-  }, [activeCompanyId]);
 
   return (
     <div className="flex flex-col items-center gap-2">
