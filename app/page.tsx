@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { getSession, isSessionAuthenticated } from "@/lib/session";
+import { getConnectedCompanies } from "@/lib/freee/session-client";
+import { CompanySwitcher } from "./CompanySwitcher";
 
 export default async function Home() {
   const session = await getSession();
   const authenticated = isSessionAuthenticated(session);
+  const { companies, activeCompanyId } = authenticated
+    ? await getConnectedCompanies()
+    : { companies: [], activeCompanyId: undefined };
+  const activeCompany = companies.find((c) => c.companyId === activeCompanyId);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-zinc-50 p-16 dark:bg-black">
@@ -14,8 +20,11 @@ export default async function Home() {
       {authenticated ? (
         <>
           <p className="text-zinc-600 dark:text-zinc-400">
-            freeeに接続済みです（事業所ID: {session.companyId}）
+            freeeに接続済みです（事業所: {activeCompany?.companyName ?? session.companyId}）
           </p>
+          {companies.length > 0 && (
+            <CompanySwitcher companies={companies} activeCompanyId={activeCompanyId} />
+          )}
           <div className="flex gap-4">
             <Link
               className="rounded-full bg-foreground px-5 py-3 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"

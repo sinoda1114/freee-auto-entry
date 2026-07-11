@@ -1,12 +1,24 @@
 import { cookies } from "next/headers";
 import { getIronSession, type IronSession, type SessionOptions } from "iron-session";
 
+export interface FreeeCompanyConnection {
+  companyId: string;
+  companyName: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
 export interface SessionData {
+  /** 現在アクティブな事業所のアクセストークン(companiesの該当エントリと同期される) */
   accessToken?: string;
   refreshToken?: string;
   expiresAt?: number;
+  /** 現在アクティブな事業所のID */
   companyId?: string;
   oauthState?: string;
+  /** OAuth認可済みの事業所ごとのトークン一覧(1トークン=1事業所のため複数保持する) */
+  companies?: FreeeCompanyConnection[];
 }
 
 export function getSessionOptions(): SessionOptions {

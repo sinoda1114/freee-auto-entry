@@ -39,7 +39,7 @@ describe("exchangeCodeForToken", () => {
       expires_in: 21600,
       refresh_token: "refresh-xyz",
       scope: "read write",
-      company_id: "123",
+      company_id: 123,
       external_cid: "ext-1",
     };
     const fetchMock = vi.fn().mockResolvedValue({
@@ -55,7 +55,7 @@ describe("exchangeCodeForToken", () => {
       redirectUri: "http://localhost:3000/api/auth/callback/freee",
     });
 
-    expect(result).toEqual(tokenPayload);
+    expect(result).toEqual({ ...tokenPayload, company_id: "123" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://accounts.secure.freee.co.jp/public_api/token");

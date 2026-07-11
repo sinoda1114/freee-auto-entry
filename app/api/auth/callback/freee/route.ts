@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFreeeOAuthConfig } from "@/lib/freee/config";
+import { getCompanies } from "@/lib/freee/company";
 import { exchangeCodeForToken } from "@/lib/freee/oauth";
+import { saveCompanyConnection } from "@/lib/freee/session-client";
 import { getSession } from "@/lib/session";
 
 export async function GET(request: NextRequest) {
@@ -32,12 +34,26 @@ export async function GET(request: NextRequest) {
     redirectUri: config.redirectUri,
   });
 
-  session.accessToken = token.access_token;
-  session.refreshToken = token.refresh_token;
-  session.expiresAt = Date.now() + token.expires_in * 1000;
-  session.companyId = token.company_id;
-  session.oauthState = undefined;
-  await session.save();
+  let companyName = `事業所 ${token.company_id}`;
+  try {
+    const companies = await getCompanies(token.access_token);
+    const matched = companies.find(
+      (company) => String(company.id) === token.company_id,
+    );
+    if (matched) {
+      companyName = matched.displayName ?? matched.name;
+    }
+  } catch {
+    // 事業所名の取得に失敗しても認可自体は継続する(フォールバック名を使う)
+  }
+
+  await saveCompanyConnection({
+    companyId: token.company_id,
+    companyName,
+    accessToken: token.access_token,
+    refreshToken: token.refresh_token,
+    expiresIn: token.expires_in,
+  });
 
   return NextResponse.redirect(new URL("/", siteUrl));
 }

@@ -12,6 +12,36 @@ export interface FreeeTokenResponse {
   external_cid: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parseTokenResponse(value: unknown): FreeeTokenResponse {
+  if (
+    !isRecord(value) ||
+    typeof value.access_token !== "string" ||
+    typeof value.token_type !== "string" ||
+    typeof value.expires_in !== "number" ||
+    typeof value.refresh_token !== "string" ||
+    typeof value.scope !== "string" ||
+    (typeof value.company_id !== "string" &&
+      typeof value.company_id !== "number") ||
+    typeof value.external_cid !== "string"
+  ) {
+    throw new Error("freee token response is invalid");
+  }
+
+  return {
+    access_token: value.access_token,
+    token_type: value.token_type,
+    expires_in: value.expires_in,
+    refresh_token: value.refresh_token,
+    scope: value.scope,
+    company_id: String(value.company_id),
+    external_cid: value.external_cid,
+  };
+}
+
 export function buildAuthorizeUrl(params: {
   clientId: string;
   redirectUri: string;
@@ -39,7 +69,8 @@ async function postTokenRequest(
     throw new Error(`freee token request failed: ${res.status}`);
   }
 
-  return res.json();
+  const data: unknown = await res.json();
+  return parseTokenResponse(data);
 }
 
 export function exchangeCodeForToken(params: {
