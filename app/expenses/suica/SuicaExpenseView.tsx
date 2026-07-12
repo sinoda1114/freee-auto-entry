@@ -9,11 +9,11 @@ import {
   encodeSuicaHandoffPayload,
   type SuicaTransitItem,
 } from "@/lib/suica/history";
+import { createSuicaExpensesAction } from "./actions";
 import {
-  createSuicaExpensesAction,
   SUICA_EXPENSE_BATCH_LIMIT,
   type SuicaExpenseFormState,
-} from "./actions";
+} from "./constants";
 
 const initialState: SuicaExpenseFormState = { status: "idle" };
 
