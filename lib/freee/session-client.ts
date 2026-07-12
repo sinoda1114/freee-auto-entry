@@ -1,4 +1,6 @@
 import { cache } from "react";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import type { FreeeCompanyConnection, SessionData } from "@/lib/session";
 import type { IronSession } from "iron-session";
@@ -8,6 +10,23 @@ import type { FreeeAuth } from "./accounting";
 
 function isTokenExpired(expiresAt?: number): boolean {
   return !expiresAt || expiresAt <= Date.now();
+}
+
+function isCookieMutationForbiddenError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.includes("Cookies can only be modified")
+  );
+}
+
+async function redirectToSessionRefresh(): Promise<never> {
+  const headerStore = await headers();
+  const pathname = headerStore.get("x-pathname");
+  const returnTo =
+    pathname && pathname.startsWith("/") && !pathname.startsWith("//")
+      ? pathname
+      : "/";
+  redirect(`/api/auth/refresh?returnTo=${encodeURIComponent(returnTo)}`);
 }
 
 /**
@@ -92,6 +111,20 @@ export const getValidFreeeAuth = cache(async (): Promise<FreeeAuth | null> => {
 
   if (!isTokenExpired(session.expiresAt)) {
     return { accessToken: session.accessToken, companyId: session.companyId };
+  }
+
+  if (!session.refreshToken) {
+    return null;
+  }
+
+  // RSC では refresh 前に cookie 書き込み可否を確認する（refresh token 消費を防ぐ）。
+  try {
+    await session.save();
+  } catch (error) {
+    if (isCookieMutationForbiddenError(error)) {
+      await redirectToSessionRefresh();
+    }
+    throw error;
   }
 
   const refreshed = await refreshSessionTokenIfExpired(session);

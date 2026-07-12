@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const getSessionMock = vi.fn();
 const refreshAccessTokenMock = vi.fn();
+const headersMock = vi.fn();
+const redirectMock = vi.fn((..._args: string[]) => {
+  throw new Error("NEXT_REDIRECT");
+});
 
 vi.mock("@/lib/session", () => ({
   getSession: () => getSessionMock(),
@@ -15,6 +19,12 @@ vi.mock("./config", () => ({
     clientSecret: "secret-1",
     redirectUri: "http://localhost:3000/api/auth/callback/freee",
   }),
+}));
+vi.mock("next/headers", () => ({
+  headers: () => headersMock(),
+}));
+vi.mock("next/navigation", () => ({
+  redirect: (url: string) => redirectMock(url),
 }));
 
 import {
@@ -71,8 +81,33 @@ describe("getValidFreeeAuth", () => {
       clientSecret: "secret-1",
       refreshToken: "refresh-1",
     });
-    expect(session.save).toHaveBeenCalledTimes(1);
+    expect(session.save).toHaveBeenCalledTimes(2);
     expect(auth).toEqual({ accessToken: "new-token", companyId: "999" });
+  });
+
+  it("redirects to the refresh route when cookies cannot be written during render", async () => {
+    const session = {
+      accessToken: "old-token",
+      refreshToken: "refresh-1",
+      companyId: "999",
+      expiresAt: Date.now() - 1000,
+      save: vi.fn().mockRejectedValue(
+        new Error(
+          "Cookies can only be modified in a Server Action or Route Handler.",
+        ),
+      ),
+    };
+    getSessionMock.mockResolvedValue(session);
+    headersMock.mockResolvedValue({
+      get: (name: string) =>
+        name === "x-pathname" ? "/expenses/new" : null,
+    });
+
+    await expect(getValidFreeeAuth()).rejects.toThrow("NEXT_REDIRECT");
+    expect(refreshAccessTokenMock).not.toHaveBeenCalled();
+    expect(redirectMock).toHaveBeenCalledWith(
+      "/api/auth/refresh?returnTo=%2Fexpenses%2Fnew",
+    );
   });
 
   it("returns null when expired and there is no refresh token", async () => {
@@ -130,6 +165,7 @@ describe("getValidFreeeAuth", () => {
       companyId: "888",
       accessToken: "other-token",
     });
+    expect(session.save).toHaveBeenCalledTimes(2);
   });
 });
 
