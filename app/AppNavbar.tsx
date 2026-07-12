@@ -18,12 +18,14 @@ interface AppNavbarProps {
   authenticated: boolean;
   companies: CompanyOption[];
   activeCompanyId?: string;
+  canRegisterExpense?: boolean;
 }
 
 export function AppNavbar({
   authenticated,
   companies,
   activeCompanyId,
+  canRegisterExpense = false,
 }: AppNavbarProps) {
   return (
     <Navbar
@@ -52,7 +54,7 @@ export function AppNavbar({
 
       {authenticated ? (
         <NavbarContent className="hidden gap-0.5 md:flex" justify="center">
-          <HeaderNav />
+          <HeaderNav canRegisterExpense={canRegisterExpense} />
         </NavbarContent>
       ) : null}
 
@@ -60,6 +62,20 @@ export function AppNavbar({
         justify="end"
         className="ml-auto flex-shrink-0 gap-1.5 sm:gap-2"
       >
+        {authenticated && canRegisterExpense ? (
+          <NavbarItem className="flex items-center">
+            <Button
+              as={NextLink}
+              href="/expenses/new"
+              color="primary"
+              size="sm"
+              className="min-w-0 px-2.5"
+              aria-label="経費を登録"
+            >
+              経費
+            </Button>
+          </NavbarItem>
+        ) : null}
         <NavbarItem className="flex items-center">
           <ThemeToggle />
         </NavbarItem>
