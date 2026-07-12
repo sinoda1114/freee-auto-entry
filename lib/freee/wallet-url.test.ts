@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  FREEE_USER_MATCHERS_URL,
   FREEE_WALLET_TXNS_LIST_URL,
   freeeWalletTxnStreamUrl,
   freeeWalletTxnStreamUrlFor,
@@ -21,6 +22,12 @@ describe("freeeWalletTxnStreamUrl", () => {
   it("exposes the wallet transaction list URL", () => {
     expect(FREEE_WALLET_TXNS_LIST_URL).toBe(
       "https://secure.freee.co.jp/wallet_txns",
+    );
+  });
+
+  it("exposes the user matchers management URL", () => {
+    expect(FREEE_USER_MATCHERS_URL).toBe(
+      "https://secure.freee.co.jp/user_matchers",
     );
   });
 });

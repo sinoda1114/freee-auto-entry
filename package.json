@@ -9,6 +9,9 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "node scripts/run-wallet-e2e.mjs",
+    "test:e2e:wallet": "node scripts/run-wallet-e2e.mjs",
+    "test:e2e:playwright": "playwright test",
     "postinstall": "node scripts/link-typescript6-for-eslint.mjs"
   },
   "dependencies": {
@@ -22,6 +25,7 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",

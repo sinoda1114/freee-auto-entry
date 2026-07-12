@@ -16,3 +16,6 @@ export function freeeWalletTxnStreamUrlFor(
 
 export const FREEE_WALLET_TXNS_LIST_URL =
   "https://secure.freee.co.jp/wallet_txns";
+
+export const FREEE_USER_MATCHERS_URL =
+  "https://secure.freee.co.jp/user_matchers";

@@ -1,12 +1,14 @@
 "use client";
 
 import { Button } from "@heroui/react";
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import type {
   InvoiceTemplateLine,
   RecurringInvoiceTemplate,
 } from "@/lib/db/recurring-invoices";
 import { formatTokyoDate, formatTokyoMonth } from "@/lib/date";
+import type { InvoiceDetail } from "@/lib/freee/invoice";
+import { computeInvoiceDiff } from "@/lib/freee/invoice-diff";
 import {
   generateRecurringInvoiceAction,
   type GenerateInvoiceState,
@@ -14,12 +16,97 @@ import {
 
 const initialState: GenerateInvoiceState = { status: "idle" };
 
+function formatAmount(amount: number): string {
+  return new Intl.NumberFormat("ja-JP", {
+    style: "currency",
+    currency: "JPY",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+interface DiffWarningProps {
+  prevInvoice: InvoiceDetail;
+  prevTargetMonth: string;
+  currentLines: InvoiceTemplateLine[];
+}
+
+function DiffWarning({
+  prevInvoice,
+  prevTargetMonth,
+  currentLines,
+}: DiffWarningProps) {
+  const diff = useMemo(
+    () => computeInvoiceDiff(prevInvoice.lines, currentLines),
+    [prevInvoice.lines, currentLines],
+  );
+
+  if (!diff.hasAnyChange) {
+    return (
+      <div className="rounded-[var(--radius-panel)] border border-success-300 bg-success-50 px-3 py-2 text-xs text-success-800 dark:border-success-700 dark:bg-success-950/40 dark:text-success-100">
+        前回（{prevTargetMonth}）と内容は同じです。合計{" "}
+        <span className="font-semibold">{formatAmount(prevInvoice.totalAmount)}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-[var(--radius-panel)] border border-warning-300 bg-warning-50 px-3 py-3 text-sm dark:border-warning-700 dark:bg-warning-950/40">
+      <p className="mb-2 font-semibold text-warning-900 dark:text-warning-100">
+        前回（{prevTargetMonth}）との差分
+      </p>
+      <div className="grid gap-1">
+        {diff.lineChanges.map((change, index) => (
+          <div
+            key={index}
+            className={`flex items-baseline justify-between gap-2 rounded px-2 py-1 text-xs ${
+              change.type === "same"
+                ? "text-[var(--freee-text-muted)]"
+                : change.type === "changed"
+                  ? "bg-warning-100 text-warning-900 dark:bg-warning-900/30 dark:text-warning-100"
+                  : change.type === "added"
+                    ? "bg-success-100 text-success-800 dark:bg-success-900/30 dark:text-success-100"
+                    : "bg-danger-100 text-danger-800 dark:bg-danger-900/30 dark:text-danger-100"
+            }`}
+          >
+            <span className="truncate font-medium">{change.description}</span>
+            <span className="shrink-0 font-mono">
+              {change.type === "changed" && change.prevAmount !== null && (
+                <span className="mr-2 line-through opacity-60">
+                  {formatAmount(change.prevAmount)}
+                </span>
+              )}
+              {change.type === "removed" && change.prevAmount !== null
+                ? formatAmount(change.prevAmount)
+                : change.currAmount !== null
+                  ? formatAmount(change.currAmount)
+                  : ""}
+            </span>
+          </div>
+        ))}
+      </div>
+      {diff.amountChanged && (
+        <p className="mt-2 text-xs font-semibold text-warning-900 dark:text-warning-100">
+          合計:{" "}
+          <span className="line-through opacity-60">
+            {formatAmount(diff.prevTotal)}
+          </span>{" "}
+          → <span>{formatAmount(diff.currTotal)}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function GenerateInvoiceForm({
   companyId,
   template,
+  prevInvoice,
+  prevTargetMonth,
 }: {
   companyId: string;
   template: RecurringInvoiceTemplate;
+  prevInvoice?: InvoiceDetail;
+  prevTargetMonth?: string;
 }) {
   const [state, formAction, isPending] = useActionState(
     generateRecurringInvoiceAction,
@@ -173,6 +260,14 @@ export function GenerateInvoiceForm({
           </div>
         ))}
       </fieldset>
+
+      {prevInvoice && prevTargetMonth && (
+        <DiffWarning
+          prevInvoice={prevInvoice}
+          prevTargetMonth={prevTargetMonth}
+          currentLines={lines}
+        />
+      )}
 
       <div className="rounded-[var(--radius-panel)] border border-warning-300 bg-warning-50 px-3 py-3 text-sm text-warning-900 dark:border-warning-700 dark:bg-warning-950/40 dark:text-warning-100">
         <label className="flex items-start gap-2 font-medium">

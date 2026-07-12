@@ -1,3 +1,5 @@
+import { isE2ETestMode } from "@/lib/e2e/fixtures";
+
 const DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite";
 
 export function getGeminiApiKey(): string | undefined {
@@ -29,8 +31,8 @@ interface GeminiGenerateContentResponse {
   };
 }
 
-export async function generateGeminiJson<T>(
-  prompt: string,
+async function callGeminiApi<T>(
+  parts: Array<Record<string, unknown>>,
   responseSchema: Record<string, unknown>,
 ): Promise<T> {
   const apiKey = getGeminiApiKey();
@@ -48,7 +50,7 @@ export async function generateGeminiJson<T>(
         "x-goog-api-key": apiKey,
       },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [{ parts }],
         generationConfig: {
           temperature: 0.2,
           responseMimeType: "application/json",
@@ -76,4 +78,56 @@ export async function generateGeminiJson<T>(
   } catch {
     throw new GeminiApiError("Gemini API returned invalid JSON.");
   }
+}
+
+export async function generateGeminiJson<T>(
+  prompt: string,
+  responseSchema: Record<string, unknown>,
+): Promise<T> {
+  if (isE2ETestMode()) {
+    void prompt;
+    void responseSchema;
+    return {
+      rules: [
+        {
+          description: "DAZN",
+          condition: 0,
+          accountItemName: "通信費",
+          taxName: "課対仕入10%",
+          entrySide: "expense",
+          reasoning: "サブスクリプション料金として通信費が妥当です。",
+          transactionIds: [102],
+        },
+      ],
+      candidates: [
+        {
+          accountItemName: "通信費",
+          taxName: "課対仕入10%",
+          condition: 0,
+          reasoning: "サブスクリプション料金として通信費が妥当です。",
+        },
+      ],
+    } as T;
+  }
+
+  return callGeminiApi<T>([{ text: prompt }], responseSchema);
+}
+
+/**
+ * 画像（base64）とテキストプロンプトを組み合わせてGeminiに問い合わせ、JSON応答を返す。
+ * マルチモーダル（vision）用。
+ */
+export async function generateGeminiJsonWithImage<T>(
+  prompt: string,
+  imageBase64: string,
+  mimeType: string,
+  responseSchema: Record<string, unknown>,
+): Promise<T> {
+  return callGeminiApi<T>(
+    [
+      { inline_data: { mime_type: mimeType, data: imageBase64 } },
+      { text: prompt },
+    ],
+    responseSchema,
+  );
 }

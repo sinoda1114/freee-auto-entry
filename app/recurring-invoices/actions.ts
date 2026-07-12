@@ -8,6 +8,7 @@ import {
   getInvoiceGenerationClaimResult,
   getRecordedInvoiceGeneration,
   getRecurringInvoiceTemplate,
+  listRecurringInvoiceTemplates,
   markInvoiceGenerationStarted,
   recordInvoiceGeneration,
   releaseInvoiceGenerationClaim,
@@ -508,4 +509,276 @@ export async function generateRecurringInvoiceAction(
           : "請求書を作成できませんでした。",
     };
   }
+}
+
+export interface BulkGenerateTemplateResult {
+  templateId: string;
+  templateName: string;
+  status: "success" | "error" | "duplicate" | "skipped";
+  message: string;
+  invoiceId?: number;
+  reportUrl?: string;
+}
+
+export interface BulkGenerateState {
+  status: "idle" | "done" | "error";
+  message?: string;
+  results?: BulkGenerateTemplateResult[];
+}
+
+export async function bulkGenerateRecurringInvoicesAction(
+  _previousState: BulkGenerateState,
+  formData: FormData,
+): Promise<BulkGenerateState> {
+  const auth = await getValidFreeeAuth();
+  if (!auth) {
+    return { status: "error", message: "freeeへ再連携してください。" };
+  }
+  if (String(formData.get("companyId") ?? "") !== auth.companyId) {
+    return {
+      status: "error",
+      message: "事業所が切り替わりました。画面を更新してください。",
+    };
+  }
+
+  const targetMonth = String(formData.get("targetMonth") ?? "");
+  const billingDate = String(formData.get("billingDate") ?? "");
+  const paymentDate = String(formData.get("paymentDate") ?? "");
+  const confirmed = formData.get("confirmed") === "on";
+  const templateIdsRaw = String(formData.get("templateIds") ?? "");
+
+  if (
+    !/^\d{4}-\d{2}$/.test(targetMonth) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(billingDate) ||
+    (paymentDate && !/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) ||
+    !confirmed
+  ) {
+    return {
+      status: "error",
+      message: "対象月、請求日、確認チェックを入力してください。",
+    };
+  }
+
+  let templateIds: string[];
+  try {
+    const parsed: unknown = JSON.parse(templateIdsRaw);
+    if (
+      !Array.isArray(parsed) ||
+      parsed.length === 0 ||
+      !parsed.every((v) => typeof v === "string")
+    ) {
+      throw new Error("invalid");
+    }
+    templateIds = parsed as string[];
+  } catch {
+    return { status: "error", message: "テンプレートが選択されていません。" };
+  }
+
+  const db = getDatabase();
+
+  let allTemplates;
+  try {
+    allTemplates = await listRecurringInvoiceTemplates(db, auth.companyId);
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof Error
+          ? error.message
+          : "定型請求を取得できませんでした。",
+    };
+  }
+
+  const templateMap = new Map(allTemplates.map((t) => [t.id, t]));
+  const results: BulkGenerateTemplateResult[] = [];
+
+  let memoTagId: number;
+  try {
+    memoTagId = await getAppMemoTagId(auth);
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof Error
+          ? error.message
+          : "タグの取得に失敗しました。",
+    };
+  }
+
+  for (const templateId of templateIds) {
+    const template = templateMap.get(templateId);
+    if (!template) {
+      results.push({
+        templateId,
+        templateName: templateId,
+        status: "skipped",
+        message: "定型請求が見つかりませんでした。",
+      });
+      continue;
+    }
+    if (!template.active) {
+      results.push({
+        templateId,
+        templateName: template.name,
+        status: "skipped",
+        message: "停止中のテンプレートはスキップしました。",
+      });
+      continue;
+    }
+
+    const generationKey = {
+      companyId: auth.companyId,
+      templateId,
+      targetMonth,
+    };
+
+    const claimToken = await claimInvoiceGeneration(db, generationKey);
+    if (!claimToken) {
+      const existingResult =
+        (await getInvoiceGenerationClaimResult(db, generationKey)) ??
+        (await getRecordedInvoiceGeneration(db, generationKey));
+      results.push({
+        templateId,
+        templateName: template.name,
+        status: "duplicate",
+        message: existingResult
+          ? `${targetMonth}分はすでに作成済みです。`
+          : `${targetMonth}分は作成中または作成済みです。`,
+        ...(existingResult
+          ? {
+              invoiceId: existingResult.invoiceId,
+              reportUrl: existingResult.reportUrl,
+            }
+          : {}),
+      });
+      continue;
+    }
+
+    const generationClaim = { ...generationKey, claimToken };
+    let invoice;
+    let externalCallStarted = false;
+    try {
+      await markInvoiceGenerationStarted(db, generationClaim);
+      externalCallStarted = true;
+      invoice = await createInvoice(auth, {
+        billingDate,
+        ...(paymentDate ? { paymentDate } : {}),
+        partnerId: template.partnerId,
+        subject: template.subject,
+        emailTo: template.emailTo,
+        emailCc: template.emailCc,
+        sendingMethod: template.sendingMethod,
+        ...(template.invoiceTemplateId
+          ? { templateId: template.invoiceTemplateId }
+          : {}),
+        lines: template.lines,
+        memoTagIds: [memoTagId],
+      });
+    } catch (error) {
+      if (!externalCallStarted) {
+        await releaseInvoiceGenerationClaim(db, generationClaim).catch(() => {});
+      }
+      if (
+        externalCallStarted &&
+        error instanceof FreeeInvoiceApiError &&
+        error.status >= 400 &&
+        error.status < 500
+      ) {
+        await releaseInvoiceGenerationClaim(db, generationClaim).catch(() => {});
+        results.push({
+          templateId,
+          templateName: template.name,
+          status: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "freeeへの作成に失敗しました。",
+        });
+        continue;
+      }
+      if (externalCallStarted) {
+        results.push({
+          templateId,
+          templateName: template.name,
+          status: "error",
+          message:
+            "freee側の作成結果を確認できませんでした。この対象月は再実行せずfreeeの請求書一覧を確認してください。",
+        });
+        continue;
+      }
+      results.push({
+        templateId,
+        templateName: template.name,
+        status: "error",
+        message:
+          error instanceof Error ? error.message : "請求書を作成できませんでした。",
+      });
+      continue;
+    }
+
+    const generationResult = {
+      invoiceId: invoice.id,
+      reportUrl: invoice.reportUrl,
+    };
+    try {
+      await saveInvoiceGenerationClaimResult(
+        db,
+        generationClaim,
+        generationResult,
+      );
+    } catch {
+      try {
+        await recordInvoiceGeneration(db, {
+          ...generationKey,
+          ...generationResult,
+        });
+      } catch {
+        results.push({
+          templateId,
+          templateName: template.name,
+          status: "success",
+          message:
+            "請求書は作成されましたが、作成履歴を保存できませんでした。",
+          ...generationResult,
+        });
+        continue;
+      }
+      await releaseInvoiceGenerationClaim(db, generationClaim).catch(() => {});
+      results.push({
+        templateId,
+        templateName: template.name,
+        status: "success",
+        message: "請求書を作成しました。",
+        ...generationResult,
+      });
+      continue;
+    }
+    try {
+      await recordInvoiceGeneration(db, {
+        ...generationKey,
+        ...generationResult,
+      });
+    } catch {
+      results.push({
+        templateId,
+        templateName: template.name,
+        status: "success",
+        message: "請求書は作成されました（履歴確定は保留中）。",
+        ...generationResult,
+      });
+      continue;
+    }
+    await releaseInvoiceGenerationClaim(db, generationClaim).catch(() => {});
+    results.push({
+      templateId,
+      templateName: template.name,
+      status: "success",
+      message: "請求書を作成しました。",
+      ...generationResult,
+    });
+  }
+
+  revalidatePath("/recurring-invoices");
+  revalidatePath("/invoices");
+  return { status: "done", results };
 }

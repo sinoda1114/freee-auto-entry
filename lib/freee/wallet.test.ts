@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createUserMatcher,
+  getUserMatcherById,
   getUserMatchers,
   getWalletTransactions,
   matchUserMatcher,
+  updateUserMatcher,
 } from "./wallet";
 
 const auth = { accessToken: "token-1", companyId: "11122591" };
@@ -109,5 +111,68 @@ describe("wallet transactions", () => {
     await getUserMatchers(auth, { offset: 0, limit: 100, act: 1 });
 
     expect(fetchMock.mock.calls[0]?.[0]).toContain("active=active&act=1");
+  });
+
+  it("fetches a single matcher by ID", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: 9,
+        entry_side_str: "expense",
+        description: "Microsoft 365",
+        condition: 3,
+        priority: 1,
+        act: 1,
+        active: true,
+        account_item_name: "通信費",
+        tax_name: "課対仕入10%",
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await getUserMatcherById(auth, 9);
+
+    expect(result.id).toBe(9);
+    expect(result.description).toBe("Microsoft 365");
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/user_matchers/9");
+  });
+
+  it("updates a matcher via PUT and returns the parsed result", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: 9,
+        entry_side_str: "expense",
+        description: "Microsoft 365",
+        condition: 3,
+        priority: 1,
+        act: 1,
+        active: false,
+        account_item_name: "通信費",
+        tax_name: "課対仕入10%",
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const matcher = {
+      id: 9,
+      entrySide: "expense" as const,
+      description: "Microsoft 365",
+      condition: 3 as const,
+      priority: 1,
+      act: 1,
+      accountItemName: "通信費",
+      taxName: "課対仕入10%",
+      active: true,
+    };
+    const result = await updateUserMatcher(auth, matcher, { active: false });
+
+    expect(result.active).toBe(false);
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toContain("/user_matchers/9");
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      active: false,
+      act: 1,
+    });
   });
 });
