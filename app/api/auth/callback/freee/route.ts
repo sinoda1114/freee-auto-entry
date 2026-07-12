@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
 
   const returnTo = session.oauthReturnTo;
   session.oauthReturnTo = undefined;
+  await session.save();
 
   await saveCompanyConnection({
     companyId: token.company_id,
