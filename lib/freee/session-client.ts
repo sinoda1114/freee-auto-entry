@@ -3,7 +3,6 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import type { FreeeCompanyConnection, SessionData } from "@/lib/session";
-import type { IronSession } from "iron-session";
 import { getFreeeOAuthConfig } from "./config";
 import { refreshAccessToken } from "./oauth";
 import type { FreeeAuth } from "./accounting";
@@ -58,20 +57,35 @@ function withLegacyConnectionMigrated(session: SessionData): FreeeCompanyConnect
   return companies;
 }
 
-async function refreshSessionTokenIfExpired(
-  session: IronSession<SessionData>,
-): Promise<boolean> {
-  if (!session.accessToken || !session.companyId || !isTokenExpired(session.expiresAt)) {
-    return Boolean(session.accessToken && session.companyId);
+export const getValidFreeeAuth = cache(async (): Promise<FreeeAuth | null> => {
+  const session = await getSession();
+
+  if (!session.accessToken || !session.companyId) {
+    return null;
+  }
+
+  if (!isTokenExpired(session.expiresAt)) {
+    return { accessToken: session.accessToken, companyId: session.companyId };
   }
 
   if (!session.refreshToken) {
-    return false;
+    return null;
+  }
+
+  // RSC では refresh 前に cookie 書き込み可否を確認する（refresh token 消費を防ぐ）。
+  // session.save() を先行呼び出しして書き込み可否を判定し、不可なら refresh route へリダイレクト。
+  try {
+    await session.save();
+  } catch (error) {
+    if (isCookieMutationForbiddenError(error)) {
+      await redirectToSessionRefresh();
+    }
+    throw error;
   }
 
   const config = getFreeeOAuthConfig();
   if (!config) {
-    return false;
+    return null;
   }
 
   const token = await refreshAccessToken({
@@ -99,41 +113,6 @@ async function refreshSessionTokenIfExpired(
   }
 
   await session.save();
-  return true;
-}
-
-export const getValidFreeeAuth = cache(async (): Promise<FreeeAuth | null> => {
-  const session = await getSession();
-
-  if (!session.accessToken || !session.companyId) {
-    return null;
-  }
-
-  if (!isTokenExpired(session.expiresAt)) {
-    return { accessToken: session.accessToken, companyId: session.companyId };
-  }
-
-  if (!session.refreshToken) {
-    return null;
-  }
-
-  // RSC では refresh 前に cookie 書き込み可否を確認する（refresh token 消費を防ぐ）。
-  // RSC では refresh 前に cookie 書き込み可否を確認する（refresh token 消費を防ぐ）。
-  try {
-    // Check if we're in a render context by attempting a noop headers() call
-    await headers();
-  } catch (error) {
-    if (isCookieMutationForbiddenError(error)) {
-      await redirectToSessionRefresh();
-    }
-    throw error;
-  }
-
-  const refreshed = await refreshSessionTokenIfExpired(session);
-  if (!refreshed || !session.accessToken || !session.companyId) {
-    return null;
-  }
-
   return { accessToken: session.accessToken, companyId: session.companyId };
 });
 
