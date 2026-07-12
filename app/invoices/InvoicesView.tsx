@@ -2,6 +2,8 @@
 
 import { Button, Chip } from "@heroui/react";
 import NextLink from "next/link";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
 import type { InvoiceSummary } from "@/lib/freee/invoice";
@@ -27,6 +29,9 @@ export function InvoicesView({
   unsentCount,
   hasNext,
 }: InvoicesViewProps) {
+  const router = useRouter();
+  const [isRefreshing, startRefresh] = useTransition();
+
   const sorted = [...invoices].sort((left, right) => {
     if (left.sendingStatus === right.sendingStatus) {
       return right.billingDate.localeCompare(left.billingDate);
@@ -42,7 +47,12 @@ export function InvoicesView({
         description="送付待ちを先頭に表示します。送信後は再取得して状態を更新してください。"
         actions={
           <>
-            <Button as={NextLink} href="/invoices" variant="bordered" size="sm">
+            <Button
+              variant="bordered"
+              size="sm"
+              isLoading={isRefreshing}
+              onPress={() => startRefresh(() => router.refresh())}
+            >
               freeeから再取得
             </Button>
             <Button
@@ -74,9 +84,19 @@ export function InvoicesView({
 
       <div className="panel mt-4 overflow-hidden shadow-sm">
         {sorted.length === 0 ? (
-          <p className="px-4 py-8 text-center text-xs text-[var(--freee-text-muted)]">
-            請求書はありません。
-          </p>
+          <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+            <p className="text-xs text-[var(--freee-text-muted)]">
+              請求書はありません。
+            </p>
+            <Button
+              as={NextLink}
+              href="/invoices/new"
+              color="primary"
+              size="sm"
+            >
+              請求書を作成
+            </Button>
+          </div>
         ) : (
           <div className="divide-y divide-default-200">
             {sorted.map((invoice) => (

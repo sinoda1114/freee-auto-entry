@@ -59,8 +59,28 @@ export function RecurringInvoicesView({
 
       <div className="mt-5 grid gap-2">
         {templates.length === 0 ? (
-          <div className="panel border-dashed px-4 py-8 text-center text-xs text-[var(--freee-text-muted)]">
-            定型請求はまだありません。
+          <div className="panel flex flex-col items-center gap-3 border-dashed px-4 py-8 text-center">
+            <p className="text-xs text-[var(--freee-text-muted)]">
+              定型請求はまだありません。
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button
+                as={NextLink}
+                href="/recurring-invoices/new"
+                color="primary"
+                size="sm"
+              >
+                定型請求を登録
+              </Button>
+              <Button
+                as={NextLink}
+                href="/recurring-invoices/from-invoice"
+                variant="bordered"
+                size="sm"
+              >
+                既存請求書から
+              </Button>
+            </div>
           </div>
         ) : (
           templates.map((template) => {

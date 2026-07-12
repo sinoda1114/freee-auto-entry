@@ -7,6 +7,8 @@
   color-scheme: light;
   --freee-blue: #2864f0;
   --freee-blue-dark: #1e4fc4;
+  --freee-billing: #0f766e;
+  --freee-billing-soft: #ccfbf1;
   --freee-bg: #f5f7fa;
   --freee-surface: #ffffff;
   --freee-text: #333333;
@@ -24,6 +26,8 @@
   color-scheme: dark;
   --freee-blue: #5b8df7;
   --freee-blue-dark: #2864f0;
+  --freee-billing: #2dd4bf;
+  --freee-billing-soft: color-mix(in srgb, #0f766e 35%, transparent);
   --freee-bg: #0f1419;
   --freee-surface: #1a2332;
   --freee-text: #e8eaed;
@@ -69,6 +73,32 @@ body {
     border-radius: var(--radius-panel);
     border: 1px solid var(--freee-border);
     background: var(--freee-surface);
+  }
+
+  .panel-domain-accounting {
+    border-left: 3px solid var(--freee-blue);
+  }
+
+  .panel-domain-billing {
+    border-left: 3px solid var(--freee-billing);
+  }
+
+  .domain-label-accounting {
+    color: var(--freee-blue);
+  }
+
+  .domain-label-billing {
+    color: var(--freee-billing);
+  }
+
+  .chip-domain-accounting {
+    background: color-mix(in srgb, var(--freee-blue) 12%, transparent);
+    color: var(--freee-blue);
+  }
+
+  .chip-domain-billing {
+    background: var(--freee-billing-soft);
+    color: var(--freee-billing);
   }
 
   .page-title {

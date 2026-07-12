@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  useActionState,
   useEffect,
   useRef,
   useState,
@@ -33,10 +32,8 @@ export function ExpenseForm({
   accountItems: AccountItem[];
   taxCodes: TaxCode[];
 }) {
-  const [state, formAction, isPending] = useActionState(
-    createExpenseAction,
-    initialState,
-  );
+  const [state, setState] = useState<ExpenseFormState>(initialState);
+  const [isPending, startSubmitTransition] = useTransition();
   const [isOcrPending, startOcrTransition] = useTransition();
 
   const [issueDate, setIssueDate] = useState(todayIsoDate());
@@ -49,6 +46,9 @@ export function ExpenseForm({
   const [ocrDone, setOcrDone] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [lastSuccessDealId, setLastSuccessDealId] = useState<number | null>(
+    null,
+  );
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -60,6 +60,25 @@ export function ExpenseForm({
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  function resetFormFields() {
+    selectedFileRef.current = null;
+    setSelectedFile(null);
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setIssueDate(todayIsoDate());
+    setAccountItemId("");
+    setTaxCode("");
+    setAmount("");
+    setDescription("");
+    setReceiptId(null);
+    setOcrError(null);
+    setOcrDone(false);
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+    if (galleryInputRef.current) galleryInputRef.current.value = "";
+  }
 
   function handleAccountItemChange(value: string) {
     setAccountItemId(value);
@@ -133,8 +152,19 @@ export function ExpenseForm({
     runOcr(file);
   }
 
+  function handleSubmit(formData: FormData) {
+    startSubmitTransition(async () => {
+      const result = await createExpenseAction(state, formData);
+      setState(result);
+      if (result.status === "success" && result.dealId) {
+        setLastSuccessDealId(result.dealId);
+        resetFormFields();
+      }
+    });
+  }
+
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form action={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 rounded border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
         <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
           領収書・証憑（任意）
@@ -339,19 +369,33 @@ export function ExpenseForm({
         {isPending ? "登録中..." : "登録する"}
       </button>
 
-      {state.status === "success" && (
-        <p className="text-green-600 dark:text-green-400">
-          登録しました（取引ID: {state.dealId}）。
-          <a
-            className="ml-2 underline"
-            href={`https://secure.freee.co.jp/deals#deal_id=${state.dealId}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            freeeで確認
-          </a>
-        </p>
-      )}
+      {lastSuccessDealId ? (
+        <div className="flex flex-col gap-2 rounded border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950/40">
+          <p className="text-sm text-green-700 dark:text-green-300">
+            登録しました（取引ID: {lastSuccessDealId}）。
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              color="primary"
+              onPress={() => cameraInputRef.current?.click()}
+            >
+              続けて登録（カメラ）
+            </Button>
+            <Button
+              as="a"
+              size="sm"
+              variant="bordered"
+              href={`https://secure.freee.co.jp/deals#deal_id=${lastSuccessDealId}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              freeeで確認
+            </Button>
+          </div>
+        </div>
+      ) : null}
       {state.status === "error" && (
         <p className="text-red-600 dark:text-red-400">{state.message}</p>
       )}

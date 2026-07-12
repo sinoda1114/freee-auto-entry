@@ -393,7 +393,7 @@ export function WalletBatchFilterBar({
       </Button>
       {selectedCount > 0 ? (
         <>
-          <span className="text-xs text-[var(--freee-text-muted)]">
+          <span className="text-xs text-[var(--freee-text-muted)] sm:inline">
             {selectedCount}件選択
           </span>
           <Button size="sm" color="primary" onPress={onOpenPreview}>
@@ -404,6 +404,36 @@ export function WalletBatchFilterBar({
           </Button>
         </>
       ) : null}
+    </div>
+  );
+}
+
+export function WalletBatchStickyBar({
+  selectedCount,
+  onClearSelection,
+  onOpenPreview,
+}: {
+  selectedCount: number;
+  onClearSelection: () => void;
+  onOpenPreview: () => void;
+}) {
+  if (selectedCount <= 0) return null;
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--freee-border)] bg-[var(--freee-surface)]/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+        <p className="text-sm font-medium text-[var(--freee-text)]">
+          {selectedCount}件選択中
+        </p>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="light" onPress={onClearSelection}>
+            解除
+          </Button>
+          <Button size="sm" color="primary" onPress={onOpenPreview}>
+            一括プレビュー
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,28 +1,134 @@
 "use client";
 
-import { Button, Chip } from "@heroui/react";
+import { Button } from "@heroui/react";
 import NextLink from "next/link";
 
-const workflows = [
-  {
-    href: "/wallet-txns",
-    title: "未処理明細",
-    description: "自動登録ルール作成と freee 確定",
-    badge: "経理",
-  },
+type Domain = "accounting" | "billing";
+
+type Workflow = {
+  href: string;
+  title: string;
+  description: string;
+  domain: Domain;
+};
+
+function buildAccountingWorkflows(canRegisterExpense: boolean): Workflow[] {
+  const items: Workflow[] = [
+    {
+      href: "/monthly-close",
+      title: "月次確認",
+      description: "今月の経理タスクをまとめて確認",
+      domain: "accounting",
+    },
+    {
+      href: "/wallet-txns",
+      title: "未処理明細",
+      description: "自動登録ルール作成と freee 確定",
+      domain: "accounting",
+    },
+  ];
+
+  if (canRegisterExpense) {
+    items.push({
+      href: "/expenses/new",
+      title: "経費（領収書OCR）",
+      description: "カメラ撮影で自動入力して登録",
+      domain: "accounting",
+    });
+  }
+
+  return items;
+}
+
+const billingWorkflows: Workflow[] = [
   {
     href: "/recurring-invoices",
     title: "定型請求",
     description: "テンプレートから月次作成",
-    badge: "請求",
+    domain: "billing",
   },
   {
     href: "/invoices",
     title: "請求書",
     description: "送付待ちの確認",
-    badge: "請求",
+    domain: "billing",
   },
-] as const;
+];
+
+function WorkflowCard({ item }: { item: Workflow }) {
+  const isAccounting = item.domain === "accounting";
+  return (
+    <NextLink
+      href={item.href}
+      className={`panel group flex items-center gap-2.5 px-3 py-2.5 transition hover:shadow-sm ${
+        isAccounting
+          ? "panel-domain-accounting hover:border-[var(--freee-blue)]/45"
+          : "panel-domain-billing hover:border-[var(--freee-billing)]/45"
+      }`}
+    >
+      <span
+        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+          isAccounting ? "chip-domain-accounting" : "chip-domain-billing"
+        }`}
+      >
+        {isAccounting ? "経理" : "請求"}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-[var(--freee-text)]">
+          {item.title}
+        </p>
+        <p className="truncate text-xs text-[var(--freee-text-muted)]">
+          {item.description}
+        </p>
+      </div>
+      <span
+        aria-hidden
+        className={`text-xs text-[var(--freee-text-muted)] transition ${
+          isAccounting
+            ? "group-hover:text-[var(--freee-blue)]"
+            : "group-hover:text-[var(--freee-billing)]"
+        }`}
+      >
+        →
+      </span>
+    </NextLink>
+  );
+}
+
+function WorkflowGroup({
+  title,
+  domain,
+  items,
+}: {
+  title: string;
+  domain: Domain;
+  items: Workflow[];
+}) {
+  return (
+    <section className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <h2
+          className={`text-xs font-bold tracking-wide ${
+            domain === "accounting"
+              ? "domain-label-accounting"
+              : "domain-label-billing"
+          }`}
+        >
+          {title}
+        </h2>
+        <span
+          aria-hidden
+          className="h-px flex-1 bg-[var(--freee-border)]"
+        />
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {items.map((item) => (
+          <WorkflowCard key={item.href} item={item} />
+        ))}
+      </div>
+    </section>
+  );
+}
 
 interface HomeDashboardProps {
   canRegisterExpense: boolean;
@@ -31,42 +137,16 @@ interface HomeDashboardProps {
 export function HomeDashboard({
   canRegisterExpense,
 }: HomeDashboardProps) {
+  const accounting = buildAccountingWorkflows(canRegisterExpense);
+
   return (
     <>
-      <section className="grid gap-2 sm:grid-cols-3">
-        {workflows.map((item) => (
-          <NextLink
-            key={item.href}
-            href={item.href}
-            className="panel group flex items-center gap-2.5 px-3 py-2.5 transition hover:border-[var(--freee-blue)]/45 hover:shadow-sm"
-          >
-            <Chip
-              size="sm"
-              variant="flat"
-              color="primary"
-              classNames={{ content: "text-[10px] font-semibold px-1" }}
-            >
-              {item.badge}
-            </Chip>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-[var(--freee-text)]">
-                {item.title}
-              </p>
-              <p className="truncate text-xs text-[var(--freee-text-muted)]">
-                {item.description}
-              </p>
-            </div>
-            <span
-              aria-hidden
-              className="text-xs text-[var(--freee-text-muted)] transition group-hover:text-[var(--freee-blue)]"
-            >
-              →
-            </span>
-          </NextLink>
-        ))}
-      </section>
+      <div className="flex flex-col gap-5">
+        <WorkflowGroup title="経理" domain="accounting" items={accounting} />
+        <WorkflowGroup title="請求" domain="billing" items={billingWorkflows} />
+      </div>
 
-      <section className="panel px-3 py-3">
+      <section className="panel mt-5 px-3 py-3">
         <p className="text-xs font-semibold text-[var(--freee-text)]">
           クイックアクション
         </p>
@@ -78,7 +158,7 @@ export function HomeDashboard({
               color="primary"
               size="sm"
             >
-              経費を登録
+              経費を撮影・登録
             </Button>
           ) : (
             <p className="text-xs text-[var(--freee-text-muted)]">
@@ -89,8 +169,7 @@ export function HomeDashboard({
             as={NextLink}
             href="/invoices/new"
             size="sm"
-            variant="bordered"
-            className="border-[var(--freee-border)] text-[var(--freee-text)]"
+            className="bg-[var(--freee-billing)] text-white data-[hover=true]:opacity-90"
           >
             請求書を作成
           </Button>

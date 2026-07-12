@@ -13,6 +13,10 @@ describe("AppHeader", () => {
       </Navbar>,
     );
 
+    expect(screen.getByRole("link", { name: "月次" })).toHaveAttribute(
+      "href",
+      "/monthly-close",
+    );
     expect(screen.getByRole("link", { name: "未処理明細" })).toHaveAttribute(
       "href",
       "/wallet-txns",
@@ -24,6 +28,22 @@ describe("AppHeader", () => {
     expect(screen.getByRole("link", { name: "請求書" })).toHaveAttribute(
       "href",
       "/invoices",
+    );
+    expect(screen.queryByRole("link", { name: "経費" })).not.toBeInTheDocument();
+  });
+
+  it("includes expense registration when the active company allows it", () => {
+    render(
+      <Navbar>
+        <NavbarContent>
+          <HeaderNav canRegisterExpense />
+        </NavbarContent>
+      </Navbar>,
+    );
+
+    expect(screen.getByRole("link", { name: "経費" })).toHaveAttribute(
+      "href",
+      "/expenses/new",
     );
   });
 });
