@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createInvoice, getInvoice, getInvoiceTemplates, getInvoices } from "./invoice";
+import {
+  createInvoice,
+  getInvoice,
+  getInvoiceTemplates,
+  getInvoices,
+  getUnsentInvoiceCount,
+} from "./invoice";
 
 const auth = { accessToken: "token-abc", companyId: "999" };
 
@@ -148,6 +154,46 @@ describe("getInvoices", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toContain(
       "company_id=999&offset=0&limit=100",
     );
+  });
+});
+
+describe("getUnsentInvoiceCount", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("counts unsent invoices across every page", async () => {
+    const invoice = (id: number, sendingStatus: "sent" | "unsent") => ({
+      id,
+      company_id: 999,
+      invoice_number: `INV-${id}`,
+      subject: `${id}月分`,
+      billing_date: "2026-07-31",
+      sending_status: sendingStatus,
+      payment_status: "unsettled",
+      total_amount: 110000,
+      partner_id: 55,
+      partner_name: "取引先A",
+      report_url: `https://invoice.secure.freee.co.jp/reports/invoices/${id}`,
+    });
+    const firstPage = Array.from({ length: 100 }, (_, index) =>
+      invoice(index + 1, index === 0 ? "unsent" : "sent"),
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ invoices: firstPage }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ invoices: [invoice(101, "unsent")] }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getUnsentInvoiceCount(auth)).resolves.toBe(2);
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("offset=0&limit=100");
+    expect(fetchMock.mock.calls[1]?.[0]).toContain("offset=100&limit=100");
   });
 });
 
