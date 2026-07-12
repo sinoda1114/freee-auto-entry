@@ -7,16 +7,89 @@ import {
   isDateInRegistrableRange,
   resolveRegistrableDateRange,
 } from "@/lib/freee/company";
+import { listExistingSuicaFingerprints } from "@/lib/freee/suica-existing";
 import { getAppMemoTagId } from "@/lib/freee/memo-tag";
 import { getValidFreeeAuth } from "@/lib/freee/session-client";
+import {
+  fingerprintFromItem,
+  formatSuicaExpenseDescription,
+  partitionByExistingFingerprints,
+} from "@/lib/suica/dedupe";
 import {
   decodeSuicaHandoffPayload,
   type SuicaTransitItem,
 } from "@/lib/suica/history";
 import {
   SUICA_EXPENSE_BATCH_LIMIT,
+  type SuicaDuplicateCheckResult,
   type SuicaExpenseFormState,
 } from "./constants";
+
+function dateBounds(items: SuicaTransitItem[]): {
+  startDate: string;
+  endDate: string;
+} | null {
+  if (items.length === 0) return null;
+  let startDate = items[0]!.date;
+  let endDate = items[0]!.date;
+  for (const item of items) {
+    if (item.date < startDate) startDate = item.date;
+    if (item.date > endDate) endDate = item.date;
+  }
+  return { startDate, endDate };
+}
+
+export async function checkSuicaDuplicatesAction(
+  encodedItems: string,
+): Promise<SuicaDuplicateCheckResult> {
+  const auth = await getValidFreeeAuth();
+  if (!auth) {
+    return {
+      status: "error",
+      message: "freeeとの連携が切れています。再度ログインしてください。",
+      duplicateIndexes: [],
+    };
+  }
+
+  let items: SuicaTransitItem[];
+  try {
+    items = decodeSuicaHandoffPayload(encodedItems).items;
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof Error ? error.message : "明細の読み取りに失敗しました。",
+      duplicateIndexes: [],
+    };
+  }
+
+  const bounds = dateBounds(items);
+  if (!bounds) {
+    return { status: "success", duplicateIndexes: [] };
+  }
+
+  try {
+    const existing = await listExistingSuicaFingerprints(
+      auth,
+      bounds.startDate,
+      bounds.endDate,
+    );
+    const { duplicateIndexes } = partitionByExistingFingerprints(
+      items,
+      existing,
+    );
+    return { status: "success", duplicateIndexes };
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof Error
+          ? error.message
+          : "既存取引の確認に失敗しました。",
+      duplicateIndexes: [],
+    };
+  }
+}
 
 export async function createSuicaExpensesAction(
   _prev: SuicaExpenseFormState,
@@ -88,25 +161,73 @@ export async function createSuicaExpensesAction(
     };
   }
 
+  const bounds = dateBounds(selected);
+  let existing = new Set<string>();
+  if (bounds) {
+    try {
+      existing = await listExistingSuicaFingerprints(
+        auth,
+        bounds.startDate,
+        bounds.endDate,
+      );
+    } catch {
+      // 照合失敗時は登録を止めず、作成時の二重押しだけはバッチ内で防ぐ
+    }
+  }
+
+  const { fresh, duplicates } = partitionByExistingFingerprints(
+    selected,
+    existing,
+  );
+
+  // 同一リクエスト内の二重も排除
+  const seenInBatch = new Set<string>();
+  const toCreate: SuicaTransitItem[] = [];
+  let skippedInBatch = 0;
+  for (const item of fresh) {
+    const fp = fingerprintFromItem(item);
+    if (seenInBatch.has(fp)) {
+      skippedInBatch += 1;
+      continue;
+    }
+    seenInBatch.add(fp);
+    toCreate.push(item);
+  }
+  const totalSkipped = duplicates.length + skippedInBatch;
+
+  if (toCreate.length === 0) {
+    return {
+      status: "success",
+      dealIds: [],
+      registeredCount: 0,
+      skippedDuplicateCount: totalSkipped,
+      message: `新規登録はありません（重複 ${totalSkipped} 件をスキップ）。`,
+    };
+  }
+
   const dealIds: number[] = [];
   try {
     const memoTagId = await getAppMemoTagId(auth);
-    for (const item of selected) {
+    for (const item of toCreate) {
       const deal = await createDeal(auth, {
         issueDate: item.date,
         accountItemId,
         taxCode,
         amount: item.amount,
-        description: item.description,
+        description: formatSuicaExpenseDescription(item),
         memoTagIds: memoTagId ? [memoTagId] : undefined,
       });
       dealIds.push(deal.id);
+      existing.add(fingerprintFromItem(item));
     }
+    const skipNote =
+      totalSkipped > 0 ? `（重複 ${totalSkipped} 件はスキップ）` : "";
     return {
       status: "success",
       dealIds,
       registeredCount: dealIds.length,
-      message: `${dealIds.length}件の経費を登録しました。`,
+      skippedDuplicateCount: totalSkipped,
+      message: `${dealIds.length}件の経費を登録しました。${skipNote}`,
     };
   } catch (error) {
     const raw = error instanceof Error ? error.message : "不明なエラーです。";
@@ -116,9 +237,10 @@ export async function createSuicaExpensesAction(
         status: "error",
         dealIds,
         registeredCount: dealIds.length,
+        skippedDuplicateCount: totalSkipped,
         message: `${dealIds.length}件まで登録したあと失敗しました: ${message}`,
       };
     }
-    return { status: "error", message };
+    return { status: "error", message, skippedDuplicateCount: totalSkipped };
   }
 }

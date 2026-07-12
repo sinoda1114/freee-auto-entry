@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Button, Checkbox } from "@heroui/react";
 import NextLink from "next/link";
 import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
@@ -13,7 +13,10 @@ import {
   encodeSuicaHandoffPayload,
   type SuicaTransitItem,
 } from "@/lib/suica/history";
-import { createSuicaExpensesAction } from "./actions";
+import {
+  checkSuicaDuplicatesAction,
+  createSuicaExpensesAction,
+} from "./actions";
 import {
   SUICA_EXPENSE_BATCH_LIMIT,
   type SuicaExpenseFormState,
@@ -28,11 +31,14 @@ function yen(amount: number): string {
 function selectableIndexes(
   items: SuicaTransitItem[],
   dateRange: RegistrableDateRange | null,
+  alreadyRegistered: ReadonlySet<number>,
 ): number[] {
   return items
-    .map((item, index) =>
-      isDateInRegistrableRange(item.date, dateRange) ? index : -1,
-    )
+    .map((item, index) => {
+      if (!isDateInRegistrableRange(item.date, dateRange)) return -1;
+      if (alreadyRegistered.has(index)) return -1;
+      return index;
+    })
     .filter((index) => index >= 0);
 }
 
@@ -52,8 +58,11 @@ export function SuicaExpenseView({
   dateRange?: RegistrableDateRange | null;
 }) {
   const [items, setItems] = useState<SuicaTransitItem[]>(initialItems);
+  const [alreadyRegistered, setAlreadyRegistered] = useState<Set<number>>(
+    () => new Set(),
+  );
   const [selected, setSelected] = useState<Set<number>>(
-    () => new Set(selectableIndexes(initialItems, dateRange)),
+    () => new Set(selectableIndexes(initialItems, dateRange, new Set())),
   );
   const [accountItemId, setAccountItemId] = useState(
     defaultAccountItemId != null ? String(defaultAccountItemId) : "",
@@ -65,6 +74,7 @@ export function SuicaExpenseView({
   const [progress, setProgress] = useState<string | null>(null);
   const [csvError, setCsvError] = useState<string | null>(null);
   const [csvInfo, setCsvInfo] = useState<string | null>(null);
+  const [isCheckingDupes, setIsCheckingDupes] = useState(false);
   const [isPending, startTransition] = useTransition();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,18 +83,61 @@ export function SuicaExpenseView({
     [items],
   );
 
-  const inRangeCount = useMemo(
-    () => selectableIndexes(items, dateRange).length,
-    [items, dateRange],
+  const selectable = useMemo(
+    () => selectableIndexes(items, dateRange, alreadyRegistered),
+    [items, dateRange, alreadyRegistered],
   );
-  const outOfRangeCount = items.length - inRangeCount;
+  const outOfRangeCount = items.filter(
+    (item) => !isDateInRegistrableRange(item.date, dateRange),
+  ).length;
 
-  function replaceItems(next: SuicaTransitItem[]) {
+  async function refreshDuplicates(
+    nextItems: SuicaTransitItem[],
+    encoded: string,
+  ): Promise<Set<number>> {
+    setIsCheckingDupes(true);
+    try {
+      const result = await checkSuicaDuplicatesAction(encoded);
+      if (result.status === "error") {
+        setCsvError(result.message ?? "重複確認に失敗しました。");
+        return new Set();
+      }
+      return new Set(result.duplicateIndexes);
+    } finally {
+      setIsCheckingDupes(false);
+    }
+  }
+
+  async function applyItems(next: SuicaTransitItem[], infoPrefix?: string) {
+    const encoded = encodeSuicaHandoffPayload({ v: 1, items: next });
     setItems(next);
-    setSelected(new Set(selectableIndexes(next, dateRange)));
     setState(initialState);
     setProgress(null);
+    const dupes = await refreshDuplicates(next, encoded);
+    setAlreadyRegistered(dupes);
+    setSelected(new Set(selectableIndexes(next, dateRange, dupes)));
+    if (infoPrefix) {
+      const out = next.filter(
+        (item) => !isDateInRegistrableRange(item.date, dateRange),
+      ).length;
+      const parts = [`${infoPrefix}${next.length} 件`];
+      if (out > 0) parts.push(`年度外 ${out} 件`);
+      if (dupes.size > 0) parts.push(`登録済み ${dupes.size} 件はスキップ`);
+      setCsvInfo(parts.join(" / "));
+    }
   }
+
+  useEffect(() => {
+    if (initialItems.length === 0) return;
+    void (async () => {
+      const encoded = encodeSuicaHandoffPayload({ v: 1, items: initialItems });
+      const dupes = await refreshDuplicates(initialItems, encoded);
+      setAlreadyRegistered(dupes);
+      setSelected(new Set(selectableIndexes(initialItems, dateRange, dupes)));
+    })();
+    // 初回のディープリンク受け取り時のみ
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleAccountChange(value: string) {
     setAccountItemId(value);
@@ -98,6 +151,7 @@ export function SuicaExpenseView({
   function toggle(index: number) {
     const item = items[index];
     if (!item || !isDateInRegistrableRange(item.date, dateRange)) return;
+    if (alreadyRegistered.has(index)) return;
     setState(initialState);
     setSelected((prev) => {
       const next = new Set(prev);
@@ -109,9 +163,7 @@ export function SuicaExpenseView({
 
   function toggleAll(checked: boolean) {
     setState(initialState);
-    setSelected(
-      checked ? new Set(selectableIndexes(items, dateRange)) : new Set(),
-    );
+    setSelected(checked ? new Set(selectable) : new Set());
   }
 
   async function handleCsvFile(file: File | undefined) {
@@ -121,14 +173,7 @@ export function SuicaExpenseView({
     try {
       const text = await file.text();
       const parsed = parseSuicaCsv(text);
-      replaceItems(parsed);
-      const ok = selectableIndexes(parsed, dateRange).length;
-      const skipped = parsed.length - ok;
-      setCsvInfo(
-        skipped > 0
-          ? `${file.name} から ${parsed.length} 件読み込み（会計年度外 ${skipped} 件は未選択）`
-          : `${file.name} から ${parsed.length} 件読み込みました。`,
-      );
+      await applyItems(parsed, `${file.name} から `);
     } catch (error) {
       setCsvError(
         error instanceof Error ? error.message : "CSV の読み込みに失敗しました。",
@@ -142,7 +187,11 @@ export function SuicaExpenseView({
     const indexes = Array.from(selected)
       .filter((index) => {
         const item = items[index];
-        return item != null && isDateInRegistrableRange(item.date, dateRange);
+        return (
+          item != null &&
+          isDateInRegistrableRange(item.date, dateRange) &&
+          !alreadyRegistered.has(index)
+        );
       })
       .sort((a, b) => a - b);
     if (indexes.length === 0) return;
@@ -151,6 +200,7 @@ export function SuicaExpenseView({
       setProgress(null);
       setState(initialState);
       const allDealIds: number[] = [];
+      let skippedDuplicates = 0;
       const total = indexes.length;
       const batches = Math.ceil(total / SUICA_EXPENSE_BATCH_LIMIT);
 
@@ -173,6 +223,7 @@ export function SuicaExpenseView({
           if (result.dealIds?.length) {
             allDealIds.push(...result.dealIds);
           }
+          skippedDuplicates += result.skippedDuplicateCount ?? 0;
 
           if (result.status === "error") {
             setProgress(null);
@@ -180,6 +231,7 @@ export function SuicaExpenseView({
               ...result,
               dealIds: allDealIds,
               registeredCount: allDealIds.length,
+              skippedDuplicateCount: skippedDuplicates,
               message:
                 allDealIds.length > 0
                   ? `${allDealIds.length}/${total} 件まで登録したあと失敗: ${result.message}`
@@ -190,13 +242,21 @@ export function SuicaExpenseView({
         }
 
         setProgress(null);
+        const skipNote =
+          skippedDuplicates > 0
+            ? `（重複 ${skippedDuplicates} 件はスキップ）`
+            : "";
         setState({
           status: "success",
           dealIds: allDealIds,
           registeredCount: allDealIds.length,
-          message: `${allDealIds.length}件の経費を登録しました。`,
+          skippedDuplicateCount: skippedDuplicates,
+          message: `${allDealIds.length}件の経費を登録しました。${skipNote}`,
         });
         setSelected(new Set());
+        // 登録後は指紋が増えるので再照合
+        const dupes = await refreshDuplicates(items, encodedItems);
+        setAlreadyRegistered(dupes);
       } catch (error) {
         setProgress(null);
         const message =
@@ -229,7 +289,8 @@ export function SuicaExpenseView({
         </p>
         <p className="text-xs text-[var(--freee-text-muted)]">
           Suica 読取アプリや会員サイトなどから書き出した CSV
-          を選んでください。日付・金額列があれば読み込みます（チャージ行は除外）。
+          を選んでください。すでに freee
+          にある明細（日付・金額・内容が同じ）は自動で除外します。
         </p>
         <input
           ref={fileInputRef}
@@ -238,6 +299,11 @@ export function SuicaExpenseView({
           className="block w-full text-sm"
           onChange={(e) => void handleCsvFile(e.target.files?.[0])}
         />
+        {isCheckingDupes ? (
+          <p className="text-xs text-[var(--freee-text-muted)]">
+            freee の既存取引と照合中…
+          </p>
+        ) : null}
         {csvError ? (
           <p className="text-sm text-red-600" role="alert">
             {csvError}
@@ -272,27 +338,35 @@ export function SuicaExpenseView({
           {outOfRangeCount > 0 ? (
             <p className="text-sm text-amber-700 dark:text-amber-400" role="status">
               会計年度外の明細が {outOfRangeCount}{" "}
-              件あります（選択不可）。期首以降だけ登録できます。
+              件あります（選択不可）。
+            </p>
+          ) : null}
+          {alreadyRegistered.size > 0 ? (
+            <p className="text-sm text-amber-700 dark:text-amber-400" role="status">
+              登録済み（重複）が {alreadyRegistered.size}{" "}
+              件あります。再登録しません。
             </p>
           ) : null}
 
           <div className="flex items-center justify-between gap-2">
             <Checkbox
               isSelected={
-                inRangeCount > 0 && selected.size === inRangeCount
+                selectable.length > 0 && selected.size === selectable.length
               }
               isIndeterminate={
-                selected.size > 0 && selected.size < inRangeCount
+                selected.size > 0 && selected.size < selectable.length
               }
               onValueChange={toggleAll}
             >
-              年度内をすべて選択（{selected.size}/{inRangeCount}）
+              未登録をすべて選択（{selected.size}/{selectable.length}）
             </Checkbox>
           </div>
 
           <ul className="divide-y divide-[var(--freee-border)]">
             {items.map((item, index) => {
               const inRange = isDateInRegistrableRange(item.date, dateRange);
+              const registered = alreadyRegistered.has(index);
+              const disabled = !inRange || registered;
               return (
                 <li
                   key={`${item.sequence}-${item.date}-${index}`}
@@ -300,7 +374,7 @@ export function SuicaExpenseView({
                 >
                   <Checkbox
                     isSelected={selected.has(index)}
-                    isDisabled={!inRange}
+                    isDisabled={disabled}
                     onValueChange={() => toggle(index)}
                     classNames={{ label: "w-full" }}
                   >
@@ -308,16 +382,20 @@ export function SuicaExpenseView({
                       <div>
                         <div
                           className={
-                            inRange
-                              ? "font-medium text-[var(--freee-text)]"
-                              : "font-medium text-[var(--freee-text-muted)] line-through"
+                            disabled
+                              ? "font-medium text-[var(--freee-text-muted)] line-through"
+                              : "font-medium text-[var(--freee-text)]"
                           }
                         >
                           {item.description}
                         </div>
                         <div className="text-[var(--freee-text-muted)]">
                           {item.date}
-                          {!inRange ? "（会計年度外）" : ""}
+                          {!inRange
+                            ? "（会計年度外）"
+                            : registered
+                              ? "（登録済み）"
+                              : ""}
                         </div>
                       </div>
                       <div className="shrink-0 font-medium">
@@ -417,7 +495,11 @@ export function SuicaExpenseView({
           <Button
             color="primary"
             isDisabled={
-              isPending || selected.size === 0 || !accountItemId || !taxCode
+              isPending ||
+              isCheckingDupes ||
+              selected.size === 0 ||
+              !accountItemId ||
+              !taxCode
             }
             isLoading={isPending}
             onPress={handleSubmit}
