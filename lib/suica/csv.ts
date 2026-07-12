@@ -1,7 +1,6 @@
 import type { SuicaTransitItem } from "./history";
 
-const CHARGE_KEYWORDS = /チャージ|現金|オート|入金|繰越|繰り越し/;
-const SKIP_TYPE_KEYWORDS = /チャージ|現金|オート|入金|繰越/;
+const CHARGE_KEYWORDS = /チャージ|現金|オート|入金|繰越|繰り越し|\+/;
 
 function stripBom(text: string): string {
   return text.replace(/^\uFEFF/, "");
@@ -53,65 +52,105 @@ export function parseCsvRows(text: string): string[][] {
 }
 
 function normalizeHeader(value: string): string {
-  return value.replace(/\s+/g, "").toLowerCase();
+  return value.replace(/[\s_]+/g, "").toLowerCase();
 }
 
-type ColumnRole =
-  | "date"
-  | "amount"
-  | "balance"
-  | "type"
-  | "from"
-  | "to"
-  | "place"
-  | "detail";
+type ColumnMap = {
+  date?: number;
+  /** 支出金額（Value / Out Value / 金額） */
+  amount?: number;
+  /** 入金側（In Value）。チャージ判定用 */
+  inAmount?: number;
+  balance?: number;
+  type?: number;
+  company?: number;
+  from?: number;
+  to?: number;
+  place?: number;
+  detail?: number;
+};
 
-function detectColumns(header: string[]): Partial<Record<ColumnRole, number>> {
-  const map: Partial<Record<ColumnRole, number>> = {};
+/**
+ * 読取アプリ（英語ヘッダ）と日本語ヘッダの両方を検出する。
+ * 例: Date, Title, Value, Out Value, Balance Value, In Station, Out Station
+ */
+export function detectColumns(header: string[]): ColumnMap {
+  const map: ColumnMap = {};
+
   header.forEach((raw, index) => {
     const h = normalizeHeader(raw);
-    if (
-      map.date == null &&
-      /(利用日|利用年月日|年月日|日付|date)/.test(h)
-    ) {
+
+    if (map.date == null && /^(利用日|利用年月日|年月日|日付|date)$/.test(h)) {
       map.date = index;
-    } else if (
-      map.amount == null &&
-      /(金額|利用額|差額|運賃|amount|fare)/.test(h)
-    ) {
-      map.amount = index;
-    } else if (map.balance == null && /(残高|残額|balance)/.test(h)) {
+      return;
+    }
+    // Balance Value を金額より先に確定
+    if (map.balance == null && /(残高|残額|balance)/.test(h)) {
       map.balance = index;
-    } else if (
+      return;
+    }
+    if (map.inAmount == null && /^(invalue|入金額)$/.test(h)) {
+      map.inAmount = index;
+      return;
+    }
+    // Out Value を優先して amount に
+    if (/(outvalue|利用額|差額|運賃|amount|fare|金額)/.test(h)) {
+      if (map.amount == null || /outvalue/.test(h)) {
+        map.amount = index;
+      }
+      return;
+    }
+    // 単独の Value（英語読取アプリ）
+    if (map.amount == null && /^value$/.test(h)) {
+      map.amount = index;
+      return;
+    }
+    if (
       map.type == null &&
-      /(種別|利用種別|処理|券種|type)/.test(h)
+      /^(title|種別|利用種別|処理|券種)$/.test(h)
     ) {
       map.type = index;
-    } else if (
+      return;
+    }
+    if (
+      map.company == null &&
+      /^(companyname|会社|事業者|鉄道会社)$/.test(h)
+    ) {
+      map.company = index;
+      return;
+    }
+    if (
       map.from == null &&
-      /(入場|乗車|発駅|入駅|from|entrance)/.test(h)
+      /^(instation|入場|乗車|発駅|入駅|entrance|fromstation)$/.test(h)
     ) {
       map.from = index;
-    } else if (
+      return;
+    }
+    if (
       map.to == null &&
-      /(出場|降車|着駅|出駅|to|exit)/.test(h)
+      /^(outstation|出場|降車|着駅|出駅|exit|tostation)$/.test(h)
     ) {
       map.to = index;
-    } else if (
+      return;
+    }
+    if (
       map.place == null &&
-      /(利用場所|利用内容|区間|詳細|内容|station)/.test(h)
+      /^(利用場所|利用内容|区間|詳細|内容)$/.test(h)
     ) {
       map.place = index;
-    } else if (map.detail == null && /(備考|メモ|note)/.test(h)) {
+      return;
+    }
+    if (map.detail == null && /^(備考|メモ|memo|note)$/.test(h)) {
       map.detail = index;
     }
   });
+
   return map;
 }
 
 function looksLikeHeader(row: string[]): boolean {
   const joined = row.map(normalizeHeader).join(",");
-  return /(日付|年月日|利用日|date)/.test(joined);
+  return /(日付|年月日|利用日|^date$|,date,)/.test(`,${joined},`);
 }
 
 function parseDate(raw: string): string | null {
@@ -133,7 +172,7 @@ function parseDate(raw: string): string | null {
 
 function parseAmountYen(raw: string): number | null {
   if (!raw.trim()) return null;
-  const negative = /[-−▲△△]|▲/.test(raw) || raw.includes("(");
+  const negative = /[-−▲]/.test(raw) || raw.includes("(");
   const digits = raw.replace(/[^\d.]/g, "");
   if (!digits) return null;
   const n = Number(digits);
@@ -146,9 +185,35 @@ function cell(row: string[], index: number | undefined): string {
   return row[index] ?? "";
 }
 
+function resolveExpenseAmount(
+  row: string[],
+  columns: ColumnMap,
+): number | null {
+  const valueCell = cell(row, columns.amount);
+  const inCell = cell(row, columns.inAmount);
+
+  // Value が +¥... の入金表示なら経費にしない
+  if (/^\s*\+/.test(valueCell) || CHARGE_KEYWORDS.test(valueCell)) {
+    return null;
+  }
+
+  // Out Value / Value を優先。空ならスキップ（In Value だけのチャージ行）
+  const fromAmountCol = parseAmountYen(valueCell);
+  if (fromAmountCol != null && fromAmountCol !== 0) {
+    return Math.abs(fromAmountCol);
+  }
+
+  // 金額列が空で In Value だけある → チャージ扱い
+  if (inCell && parseAmountYen(inCell) != null) {
+    return null;
+  }
+
+  return null;
+}
+
 /**
  * Suica / ICカード読取アプリ等の CSV を経費候補に変換する。
- * チャージ行は除外。金額列が負なら絶対値、正ならそのまま支出として扱う。
+ * チャージ行は除外。
  */
 export function parseSuicaCsv(text: string): SuicaTransitItem[] {
   const rows = parseCsvRows(text);
@@ -161,7 +226,6 @@ export function parseSuicaCsv(text: string): SuicaTransitItem[] {
   if (looksLikeHeader(rows[0] ?? []) && columns.date != null) {
     start = 1;
   } else {
-    // ヘッダなし: 先頭列=日付, 金額らしき列を推定
     columns = {
       date: 0,
       type: rows[0] && rows[0].length > 1 ? 1 : undefined,
@@ -173,7 +237,12 @@ export function parseSuicaCsv(text: string): SuicaTransitItem[] {
 
   if (columns.date == null) {
     throw new Error(
-      "日付列が見つかりません。ヘッダに「利用日」「日付」などを含めてください。",
+      "日付列が見つかりません。ヘッダに「利用日」「Date」などを含めてください。",
+    );
+  }
+  if (columns.amount == null) {
+    throw new Error(
+      "金額列が見つかりません。ヘッダに「金額」「Value」「Out Value」などを含めてください。",
     );
   }
 
@@ -184,32 +253,26 @@ export function parseSuicaCsv(text: string): SuicaTransitItem[] {
     if (!date) continue;
 
     const type = cell(row, columns.type);
+    const company = cell(row, columns.company);
     const place = cell(row, columns.place);
     const from = cell(row, columns.from);
     const to = cell(row, columns.to);
     const detail = cell(row, columns.detail);
-    const combinedType = `${type} ${place} ${detail}`;
+    const combinedType = `${type} ${company} ${place} ${detail}`;
 
-    if (SKIP_TYPE_KEYWORDS.test(combinedType) || CHARGE_KEYWORDS.test(type)) {
+    if (CHARGE_KEYWORDS.test(combinedType)) {
       continue;
     }
 
-    const amountRaw = parseAmountYen(cell(row, columns.amount));
-    // 金額列がなく残高だけの形式はスキップ（差分推定はしない）
-    if (amountRaw == null || amountRaw === 0) continue;
-
-    // 正の金額=支出、負の金額=支出（符号付きエクスポート）の両方に対応
-    const amount = Math.abs(amountRaw);
-    if (amount <= 0) continue;
-
-    // チャージが金額プラスで出る場合（入金）を種別で弾き切れなかったら、
-    // 「現金」「オート」以外で金額だけ大きい行は通す（手動選択で除外可能）
+    const amount = resolveExpenseAmount(row, columns);
+    if (amount == null || amount <= 0) continue;
 
     const route =
       from && to
         ? `${from}→${to}`
-        : place || detail || type || "交通";
-    const description = `Suica ${type || "利用"} ${route}`.trim();
+        : from || to || place || company || type || "交通";
+    const label = [type, company].filter(Boolean).join(" ");
+    const description = `Suica ${label || "利用"} ${route}`.trim();
 
     const balance = parseAmountYen(cell(row, columns.balance));
 
@@ -217,7 +280,11 @@ export function parseSuicaCsv(text: string): SuicaTransitItem[] {
       date,
       amount,
       balance: balance != null ? Math.abs(balance) : 0,
-      processType: /物販|購/.test(combinedType) ? 0x46 : 0x01,
+      processType: /物販|購/.test(combinedType)
+        ? 0x46
+        : /バス/.test(combinedType)
+          ? 0x0f
+          : 0x01,
       entranceCode: 0,
       exitCode: 0,
       region: 0,
