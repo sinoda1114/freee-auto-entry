@@ -11,6 +11,7 @@ import {
 } from "@/lib/suica/history";
 import {
   createSuicaExpensesAction,
+  SUICA_EXPENSE_BATCH_LIMIT,
   type SuicaExpenseFormState,
 } from "./actions";
 
@@ -44,6 +45,7 @@ export function SuicaExpenseView({
     defaultTaxCode != null ? String(defaultTaxCode) : "",
   );
   const [state, setState] = useState<SuicaExpenseFormState>(initialState);
+  const [progress, setProgress] = useState<string | null>(null);
   const [csvError, setCsvError] = useState<string | null>(null);
   const [csvInfo, setCsvInfo] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -58,6 +60,7 @@ export function SuicaExpenseView({
     setItems(next);
     setSelected(new Set(next.map((_, i) => i)));
     setState(initialState);
+    setProgress(null);
   }
 
   function handleAccountChange(value: string) {
@@ -70,6 +73,7 @@ export function SuicaExpenseView({
   }
 
   function toggle(index: number) {
+    setState(initialState);
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(index)) next.delete(index);
@@ -79,6 +83,7 @@ export function SuicaExpenseView({
   }
 
   function toggleAll(checked: boolean) {
+    setState(initialState);
     setSelected(checked ? new Set(items.map((_, i) => i)) : new Set());
   }
 
@@ -101,19 +106,83 @@ export function SuicaExpenseView({
   }
 
   function handleSubmit() {
+    const indexes = Array.from(selected).sort((a, b) => a - b);
+    if (indexes.length === 0) return;
+
     startTransition(async () => {
-      const fd = new FormData();
-      fd.set("encodedItems", encodedItems);
-      fd.set("accountItemId", accountItemId);
-      fd.set("taxCode", taxCode);
-      fd.set(
-        "selectedIndexes",
-        Array.from(selected).sort((a, b) => a - b).join(","),
-      );
-      const result = await createSuicaExpensesAction(state, fd);
-      setState(result);
+      setProgress(null);
+      setState(initialState);
+      const allDealIds: number[] = [];
+      const total = indexes.length;
+      const batches = Math.ceil(total / SUICA_EXPENSE_BATCH_LIMIT);
+
+      try {
+        for (let batchIndex = 0; batchIndex < batches; batchIndex += 1) {
+          const start = batchIndex * SUICA_EXPENSE_BATCH_LIMIT;
+          const chunk = indexes.slice(start, start + SUICA_EXPENSE_BATCH_LIMIT);
+          const doneBefore = allDealIds.length;
+          setProgress(
+            `登録中… ${doneBefore}/${total}（${batchIndex + 1}/${batches} バッチ）`,
+          );
+
+          const fd = new FormData();
+          fd.set("encodedItems", encodedItems);
+          fd.set("accountItemId", accountItemId);
+          fd.set("taxCode", taxCode);
+          fd.set("selectedIndexes", chunk.join(","));
+
+          const result = await createSuicaExpensesAction(initialState, fd);
+          if (result.dealIds?.length) {
+            allDealIds.push(...result.dealIds);
+          }
+
+          if (result.status === "error") {
+            setProgress(null);
+            setState({
+              ...result,
+              dealIds: allDealIds,
+              registeredCount: allDealIds.length,
+              message:
+                allDealIds.length > 0
+                  ? `${allDealIds.length}/${total} 件まで登録したあと失敗: ${result.message}`
+                  : result.message,
+            });
+            return;
+          }
+        }
+
+        setProgress(null);
+        setState({
+          status: "success",
+          dealIds: allDealIds,
+          registeredCount: allDealIds.length,
+          message: `${allDealIds.length}件の経費を登録しました。`,
+        });
+        // 登録済みを選択解除
+        setSelected(new Set());
+      } catch (error) {
+        setProgress(null);
+        const message =
+          error instanceof Error
+            ? error.message
+            : "通信エラーで中断しました。件数を減らして再試行してください。";
+        setState({
+          status: "error",
+          dealIds: allDealIds,
+          registeredCount: allDealIds.length,
+          message:
+            allDealIds.length > 0
+              ? `${allDealIds.length}/${total} 件まで登録したあと中断: ${message}`
+              : message,
+        });
+      }
     });
   }
+
+  const batchHint =
+    selected.size > SUICA_EXPENSE_BATCH_LIMIT
+      ? `選択 ${selected.size} 件 → ${SUICA_EXPENSE_BATCH_LIMIT} 件ずつ自動分割して登録します。`
+      : null;
 
   return (
     <div className="panel mt-4 space-y-4 px-4 py-4">
@@ -158,7 +227,7 @@ export function SuicaExpenseView({
         <>
           <div className="flex items-center justify-between gap-2">
             <Checkbox
-              isSelected={selected.size === items.length}
+              isSelected={selected.size === items.length && items.length > 0}
               isIndeterminate={
                 selected.size > 0 && selected.size < items.length
               }
@@ -234,6 +303,14 @@ export function SuicaExpenseView({
             </label>
           </div>
 
+          {batchHint ? (
+            <p className="text-xs text-[var(--freee-text-muted)]">{batchHint}</p>
+          ) : null}
+          {progress ? (
+            <p className="text-sm text-[var(--freee-text)]" role="status">
+              {progress}
+            </p>
+          ) : null}
           {state.status === "error" ? (
             <p className="text-sm text-red-600" role="alert">
               {state.message}
@@ -242,25 +319,20 @@ export function SuicaExpenseView({
           {state.status === "success" ? (
             <p className="text-sm text-green-700" role="status">
               {state.message}
-              {state.dealIds?.length
-                ? `（取引ID: ${state.dealIds.join(", ")}）`
-                : null}
             </p>
           ) : null}
 
           <Button
             color="primary"
             isDisabled={
-              isPending ||
-              selected.size === 0 ||
-              !accountItemId ||
-              !taxCode ||
-              state.status === "success"
+              isPending || selected.size === 0 || !accountItemId || !taxCode
             }
             isLoading={isPending}
             onPress={handleSubmit}
           >
-            選択した明細を経費登録
+            {isPending
+              ? "登録中…"
+              : `選択した${selected.size}件を経費登録`}
           </Button>
         </>
       )}
