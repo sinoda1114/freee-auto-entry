@@ -60,15 +60,17 @@ function WorkflowCard({ item }: { item: Workflow }) {
   return (
     <NextLink
       href={item.href}
-      className={`panel group flex items-center gap-2.5 px-3 py-2.5 transition hover:shadow-sm ${
+      className={`panel group flex items-center gap-2.5 border-l-[3px] px-3 py-2.5 transition hover:shadow-sm ${
         isAccounting
-          ? "panel-domain-accounting hover:border-[var(--freee-blue)]/45"
-          : "panel-domain-billing hover:border-[var(--freee-billing)]/45"
+          ? "border-l-freee-blue hover:border-freee-blue/45"
+          : "border-l-freee-billing hover:border-freee-billing/45"
       }`}
     >
       <span
         className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-          isAccounting ? "chip-domain-accounting" : "chip-domain-billing"
+          isAccounting
+            ? "bg-freee-blue/15 text-freee-blue"
+            : "bg-freee-billing-soft text-freee-billing"
         }`}
       >
         {isAccounting ? "経理" : "請求"}
@@ -85,8 +87,8 @@ function WorkflowCard({ item }: { item: Workflow }) {
         aria-hidden
         className={`text-xs text-[var(--freee-text-muted)] transition ${
           isAccounting
-            ? "group-hover:text-[var(--freee-blue)]"
-            : "group-hover:text-[var(--freee-billing)]"
+            ? "group-hover:text-freee-blue"
+            : "group-hover:text-freee-billing"
         }`}
       >
         →
@@ -109,9 +111,7 @@ function WorkflowGroup({
       <div className="flex items-center gap-2">
         <h2
           className={`text-xs font-bold tracking-wide ${
-            domain === "accounting"
-              ? "domain-label-accounting"
-              : "domain-label-billing"
+            domain === "accounting" ? "text-freee-blue" : "text-freee-billing"
           }`}
         >
           {title}
@@ -169,7 +169,7 @@ export function HomeDashboard({
             as={NextLink}
             href="/invoices/new"
             size="sm"
-            className="bg-[var(--freee-billing)] text-white data-[hover=true]:opacity-90"
+            className="bg-freee-billing text-white data-[hover=true]:opacity-90"
           >
             請求書を作成
           </Button>

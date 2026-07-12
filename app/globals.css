@@ -38,12 +38,18 @@
   --freee-hero-to: #102860;
   --background: var(--freee-bg);
   --foreground: var(--freee-text);
+  /* @theme 由来のユーティリティ色も dark で上書き */
+  --color-freee-blue: #5b8df7;
+  --color-freee-billing: #2dd4bf;
+  --color-freee-billing-soft: color-mix(in srgb, #0f766e 35%, transparent);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-freee-blue: var(--freee-blue);
+  --color-freee-blue: #2864f0;
+  --color-freee-billing: #0f766e;
+  --color-freee-billing-soft: #ccfbf1;
   --color-freee-surface: var(--freee-surface);
   --font-sans: var(--font-biz-ud-gothic);
   --font-mono: var(--font-jetbrains-mono);
@@ -73,32 +79,6 @@ body {
     border-radius: var(--radius-panel);
     border: 1px solid var(--freee-border);
     background: var(--freee-surface);
-  }
-
-  .panel-domain-accounting {
-    border-left: 3px solid var(--freee-blue);
-  }
-
-  .panel-domain-billing {
-    border-left: 3px solid var(--freee-billing);
-  }
-
-  .domain-label-accounting {
-    color: var(--freee-blue);
-  }
-
-  .domain-label-billing {
-    color: var(--freee-billing);
-  }
-
-  .chip-domain-accounting {
-    background: color-mix(in srgb, var(--freee-blue) 12%, transparent);
-    color: var(--freee-blue);
-  }
-
-  .chip-domain-billing {
-    background: var(--freee-billing-soft);
-    color: var(--freee-billing);
   }
 
   .page-title {

@@ -126,7 +126,7 @@ export function AppNavbar({
 
       {authenticated ? (
         <NavbarMenu className="bg-[var(--freee-surface)] pt-2">
-          <p className="domain-label-accounting px-3 pb-1 text-[10px] font-bold tracking-wide">
+          <p className="px-3 pb-1 text-[10px] font-bold tracking-wide text-freee-blue">
             経理
           </p>
           {mobileItems
@@ -140,7 +140,7 @@ export function AppNavbar({
                     aria-current={active ? "page" : undefined}
                     className={`block w-full rounded-md px-3 py-2 text-sm font-medium ${
                       active
-                        ? "bg-[var(--freee-blue)]/10 text-[var(--freee-blue)]"
+                        ? "bg-freee-blue/10 text-freee-blue"
                         : "text-[var(--freee-text)]"
                     }`}
                     onClick={() => setIsMenuOpen(false)}
@@ -151,7 +151,7 @@ export function AppNavbar({
               );
             })}
           <div className="mx-3 my-2 border-t border-[var(--freee-border)]" />
-          <p className="domain-label-billing px-3 pb-1 text-[10px] font-bold tracking-wide">
+          <p className="px-3 pb-1 text-[10px] font-bold tracking-wide text-freee-billing">
             請求
           </p>
           {mobileItems
@@ -165,7 +165,7 @@ export function AppNavbar({
                     aria-current={active ? "page" : undefined}
                     className={`block w-full rounded-md px-3 py-2 text-sm font-medium ${
                       active
-                        ? "bg-[var(--freee-billing)]/10 text-[var(--freee-billing)]"
+                        ? "bg-freee-billing/10 text-freee-billing"
                         : "text-[var(--freee-text)]"
                     }`}
                     onClick={() => setIsMenuOpen(false)}
