@@ -47,6 +47,9 @@ export async function GET(request: NextRequest) {
     // 事業所名の取得に失敗しても認可自体は継続する(フォールバック名を使う)
   }
 
+  const returnTo = session.oauthReturnTo;
+  session.oauthReturnTo = undefined;
+
   await saveCompanyConnection({
     companyId: token.company_id,
     companyName,
@@ -55,5 +58,9 @@ export async function GET(request: NextRequest) {
     expiresIn: token.expires_in,
   });
 
-  return NextResponse.redirect(new URL("/", siteUrl));
+  const destination =
+    returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
+      ? returnTo
+      : "/";
+  return NextResponse.redirect(new URL(destination, siteUrl));
 }

@@ -12,6 +12,7 @@
     "test:e2e": "node scripts/run-wallet-e2e.mjs",
     "test:e2e:wallet": "node scripts/run-wallet-e2e.mjs",
     "test:e2e:playwright": "playwright test",
+    "test:suica-smoke": "node scripts/suica-smoke.mjs",
     "postinstall": "node scripts/link-typescript6-for-eslint.mjs"
   },
   "dependencies": {
