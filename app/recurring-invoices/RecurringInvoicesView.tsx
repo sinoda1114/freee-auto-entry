@@ -5,6 +5,7 @@ import NextLink from "next/link";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
 import type { RecurringInvoiceTemplate } from "@/lib/db/recurring-invoices";
+import { BulkGeneratePanel } from "./BulkGeneratePanel";
 import { DeleteTemplateForm } from "./DeleteTemplateForm";
 import { ToggleTemplateForm } from "./ToggleTemplateForm";
 
@@ -53,6 +54,8 @@ export function RecurringInvoicesView({
           </>
         }
       />
+
+      <BulkGeneratePanel companyId={companyId} templates={templates} />
 
       <div className="mt-5 grid gap-2">
         {templates.length === 0 ? (

@@ -1,3 +1,10 @@
+import {
+  e2eAccountItems,
+  e2eTaxCodes,
+  e2eWalletables,
+  isE2ETestMode,
+} from "@/lib/e2e/fixtures";
+
 const ACCOUNTING_API_BASE = "https://api.freee.co.jp/api/1";
 
 export interface FreeeAuth {
@@ -37,6 +44,7 @@ export interface CreateDealInput {
   amount: number;
   description: string;
   memoTagIds?: number[];
+  receiptIds?: number[];
 }
 
 async function freeeFetch(auth: FreeeAuth, path: string, init: RequestInit = {}) {
@@ -58,6 +66,9 @@ async function freeeFetch(auth: FreeeAuth, path: string, init: RequestInit = {})
 }
 
 export async function getAccountItems(auth: FreeeAuth): Promise<AccountItem[]> {
+  if (isE2ETestMode()) {
+    return e2eAccountItems;
+  }
   const data = await freeeFetch(
     auth,
     `/account_items?company_id=${auth.companyId}`,
@@ -90,6 +101,9 @@ interface RawTaxCode {
 }
 
 export async function getTaxCodes(auth: FreeeAuth): Promise<TaxCode[]> {
+  if (isE2ETestMode()) {
+    return e2eTaxCodes;
+  }
   const data = await freeeFetch(auth, `/taxes/companies/${auth.companyId}`);
   return (data.taxes as RawTaxCode[])
     .filter((tax) => tax.available)
@@ -97,6 +111,9 @@ export async function getTaxCodes(auth: FreeeAuth): Promise<TaxCode[]> {
 }
 
 export async function getWalletables(auth: FreeeAuth): Promise<Walletable[]> {
+  if (isE2ETestMode()) {
+    return e2eWalletables;
+  }
   const data = await freeeFetch(
     auth,
     `/walletables?company_id=${auth.companyId}`,
@@ -128,6 +145,7 @@ export async function createDeal(
           ...(input.memoTagIds ? { tag_ids: input.memoTagIds } : {}),
         },
       ],
+      ...(input.receiptIds ? { receipt_ids: input.receiptIds } : {}),
     }),
   });
   return data.deal;

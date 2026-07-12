@@ -18,6 +18,9 @@ coverage/
 *.log
 *.db
 .freee-local.db*
+.freee-e2e.db*
+/test-results/
+/playwright-report/
 
 # Next.js / Vercel
 next-env.d.ts

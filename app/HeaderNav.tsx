@@ -5,6 +5,7 @@ import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 
 const navigation = [
+  { href: "/monthly-close", label: "月次" },
   { href: "/wallet-txns", label: "未処理明細" },
   { href: "/recurring-invoices", label: "定型請求" },
   { href: "/invoices", label: "請求書" },

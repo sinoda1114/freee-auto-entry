@@ -5,7 +5,9 @@ import {
   markMatcherCreationStarted,
   releaseMatcherCreation,
 } from "@/lib/db/matcher-creation";
+import { recordMatcherHistory } from "@/lib/db/matcher-history";
 import type { Database } from "@/lib/db/types";
+import { isE2ETestMode } from "@/lib/e2e/fixtures";
 import {
   createUserMatcher,
   FreeeAccountingApiError,
@@ -22,6 +24,7 @@ export interface MatcherCreateInput {
   accountItemName: string;
   taxName: string;
   walletable?: string;
+  source?: string;
 }
 
 export type MatcherCreateResult =
@@ -70,15 +73,6 @@ export async function createMatcherWithLock(
     };
   }
 
-  const ruleKey = ruleKeyFor(input);
-  const claim = await claimMatcherCreation(db, auth.companyId, ruleKey);
-  if (!claim) {
-    return {
-      status: "locked",
-      message: "同じ条件の自動登録ルールは作成済み、または作成処理中です。",
-    };
-  }
-
   const payload: CreateUserMatcherInput = {
     entrySide: input.entrySide,
     description: input.description,
@@ -88,6 +82,33 @@ export async function createMatcherWithLock(
     taxName: input.taxName,
     ...(input.walletable ? { walletable: input.walletable } : {}),
   };
+
+  if (isE2ETestMode()) {
+    const matcher = await createUserMatcher(auth, payload);
+    try {
+      await recordMatcherHistory(db, {
+        companyId: auth.companyId,
+        matcherId: matcher.id,
+        description: input.description,
+        accountItemName: input.accountItemName,
+        taxName: input.taxName,
+        entrySide: input.entrySide,
+        source: input.source,
+      });
+    } catch {
+      // history recording failure must not block the main result
+    }
+    return { status: "success", matcherId: matcher.id };
+  }
+
+  const ruleKey = ruleKeyFor(input);
+  const claim = await claimMatcherCreation(db, auth.companyId, ruleKey);
+  if (!claim) {
+    return {
+      status: "locked",
+      message: "同じ条件の自動登録ルールは作成済み、または作成処理中です。",
+    };
+  }
 
   let externalCallStarted = false;
   let matcher: { id: number };
@@ -126,6 +147,20 @@ export async function createMatcherWithLock(
       status: "success",
       matcherId: matcher.id,
     };
+  }
+
+  try {
+    await recordMatcherHistory(db, {
+      companyId: auth.companyId,
+      matcherId: matcher.id,
+      description: input.description,
+      accountItemName: input.accountItemName,
+      taxName: input.taxName,
+      entrySide: input.entrySide,
+      source: input.source,
+    });
+  } catch {
+    // history recording failure must not block the main result
   }
 
   return { status: "success", matcherId: matcher.id };

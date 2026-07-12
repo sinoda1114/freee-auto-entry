@@ -18,6 +18,7 @@ import {
 } from "@/lib/freee/wallet-url";
 import { MatcherRulePanel, MatcherRuleTrigger } from "./MatcherForm";
 import { WalletBatchFilterBar, WalletBatchPanel } from "./WalletBatchPanel";
+import { WalletTxnSubNav } from "./WalletTxnSubNav";
 
 interface WalletTransactionsViewProps {
   companyId: string;
@@ -164,6 +165,8 @@ export function WalletTransactionsView({
           の明細一覧で確認してください。
         </p>
       ) : null}
+
+      <WalletTxnSubNav />
 
       {transactions.length > 0 ? (
         <WalletBatchFilterBar

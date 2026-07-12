@@ -53,6 +53,19 @@ const schemaStatements = [
     matcher_id INTEGER,
     PRIMARY KEY(company_id, rule_key)
   )`,
+  `CREATE TABLE IF NOT EXISTS matcher_creation_history (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL,
+    matcher_id INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    account_item_name TEXT NOT NULL,
+    tax_name TEXT NOT NULL,
+    entry_side TEXT NOT NULL,
+    source TEXT,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_matcher_creation_history_company
+    ON matcher_creation_history (company_id, created_at DESC)`,
 ] as const;
 
 let initialized = false;

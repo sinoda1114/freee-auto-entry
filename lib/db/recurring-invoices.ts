@@ -517,6 +517,38 @@ export async function getRecordedInvoiceGeneration(
     : null;
 }
 
+export async function getLastInvoiceGenerationForTemplate(
+  db: Database,
+  companyId: string,
+  templateId: string,
+): Promise<(InvoiceGenerationKey & InvoiceGenerationResult) | null> {
+  await ensureDatabaseSchema(db);
+  const result = await db.execute(
+    `SELECT template_id, target_month, invoice_id, report_url
+      FROM invoice_generation_history
+      WHERE company_id = :companyId AND template_id = :templateId
+      ORDER BY target_month DESC
+      LIMIT 1`,
+    { companyId, templateId },
+  );
+  const row = result.rows[0];
+  if (
+    !row ||
+    typeof row.invoice_id !== "number" ||
+    typeof row.report_url !== "string" ||
+    typeof row.target_month !== "string"
+  ) {
+    return null;
+  }
+  return {
+    companyId,
+    templateId,
+    targetMonth: row.target_month,
+    invoiceId: row.invoice_id,
+    reportUrl: row.report_url,
+  };
+}
+
 export async function recordInvoiceGeneration(
   db: Database,
   input: InvoiceGenerationKey & {

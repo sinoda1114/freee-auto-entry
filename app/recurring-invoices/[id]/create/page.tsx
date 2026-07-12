@@ -2,8 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
-import { getRecurringInvoiceTemplate } from "@/lib/db/recurring-invoices";
+import {
+  getLastInvoiceGenerationForTemplate,
+  getRecurringInvoiceTemplate,
+} from "@/lib/db/recurring-invoices";
 import { getDatabase } from "@/lib/db/turso";
+import { getInvoice } from "@/lib/freee/invoice";
+import type { InvoiceDetail } from "@/lib/freee/invoice";
 import { getValidFreeeAuth } from "@/lib/freee/session-client";
 import { GenerateInvoiceForm } from "../../GenerateInvoiceForm";
 
@@ -17,13 +22,26 @@ export default async function CreateRecurringInvoicePage({
     return <p className="p-10 text-center">freeeへ再連携してください。</p>;
   }
   const { id } = await params;
-  const template = await getRecurringInvoiceTemplate(
-    getDatabase(),
-    auth.companyId,
-    id,
-  );
+  const db = getDatabase();
+  const template = await getRecurringInvoiceTemplate(db, auth.companyId, id);
   if (!template) {
     notFound();
+  }
+
+  let prevInvoice: InvoiceDetail | null = null;
+  let prevTargetMonth: string | null = null;
+  try {
+    const lastGeneration = await getLastInvoiceGenerationForTemplate(
+      db,
+      auth.companyId,
+      template.id,
+    );
+    if (lastGeneration) {
+      prevTargetMonth = lastGeneration.targetMonth;
+      prevInvoice = await getInvoice(auth, lastGeneration.invoiceId);
+    }
+  } catch {
+    // Non-fatal: show form without diff if fetch fails
   }
 
   return (
@@ -40,7 +58,12 @@ export default async function CreateRecurringInvoicePage({
         description={`${template.partnerName} 宛ての内容を今回分だけ編集し、確認後に作成します。`}
       />
       <div className="panel mt-4 px-4 py-4">
-        <GenerateInvoiceForm companyId={auth.companyId} template={template} />
+        <GenerateInvoiceForm
+          companyId={auth.companyId}
+          template={template}
+          prevInvoice={prevInvoice ?? undefined}
+          prevTargetMonth={prevTargetMonth ?? undefined}
+        />
       </div>
     </PageShell>
   );

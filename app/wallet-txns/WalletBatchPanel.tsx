@@ -9,7 +9,9 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@heroui/react";
-import { useActionState, useMemo } from "react";
+import { useActionState, useMemo, useState } from "react";
+import { batchLlmRulesToDrafts } from "@/lib/ai/matcher-batch-llm-suggestion";
+import { MATCHER_CONDITION_LABELS } from "@/lib/freee/matcher-labels";
 import {
   buildRuleDraftsFromPreview,
   dedupeRuleDrafts,
@@ -21,15 +23,13 @@ import {
   bulkCreateMatcherRulesAction,
   type BatchMatcherActionState,
 } from "./batch-actions";
+import {
+  requestBatchLlmMatcherSuggestionAction,
+  type BatchLlmSuggestionState,
+} from "./batch-llm-suggestion-action";
 
 const initialBatchState: BatchMatcherActionState = { status: "idle" };
-
-const CONDITION_LABELS = {
-  0: "部分一致",
-  1: "前方一致",
-  2: "後方一致",
-  3: "完全一致",
-} as const;
+const initialAiState: BatchLlmSuggestionState = { status: "idle" };
 
 function formatAmount(amount: number): string {
   return new Intl.NumberFormat("ja-JP", {
@@ -71,7 +71,7 @@ function PreviewSection({
                 {item.matchedRule
                   ? ` · ${item.matchedRule.accountItemName ?? ""} / ${item.matchedRule.taxName ?? ""}`
                   : item.suggestion
-                    ? ` · ${item.suggestion.accountItemName} / ${item.suggestion.taxName} / ${CONDITION_LABELS[item.suggestion.condition]}`
+                    ? ` · ${item.suggestion.accountItemName} / ${item.suggestion.taxName} / ${MATCHER_CONDITION_LABELS[item.suggestion.condition]}`
                     : null}
               </p>
             </div>
@@ -96,10 +96,15 @@ export function WalletBatchPanel({
   onClose: () => void;
   selectedItems: WalletBatchPreviewItem[];
 }) {
-  const [state, formAction, pending] = useActionState(
+  const [batchState, formAction, pending] = useActionState(
     bulkCreateMatcherRulesAction,
     initialBatchState,
   );
+  const [aiState, aiFormAction, aiPending] = useActionState(
+    requestBatchLlmMatcherSuggestionAction,
+    initialAiState,
+  );
+  const [aiDismissed, setAiDismissed] = useState(false);
 
   const matchedItems = useMemo(
     () => selectedItems.filter((item) => item.category === "rule_matched"),
@@ -113,16 +118,46 @@ export function WalletBatchPanel({
     () => selectedItems.filter((item) => item.category === "no_suggestion"),
     [selectedItems],
   );
-
-  const ruleDrafts = useMemo(
-    () => dedupeRuleDrafts(buildRuleDraftsFromPreview(suggestedItems)),
-    [suggestedItems],
+  const aiTargetItems = useMemo(
+    () => selectedItems.filter((item) => item.category !== "rule_matched"),
+    [selectedItems],
   );
 
-  const showResults = state.status !== "idle" && state.results;
+  const aiRules = useMemo(
+    () => (!aiDismissed && aiState.status === "success" ? aiState.rules : []),
+    [aiDismissed, aiState],
+  );
+
+  const ruleDrafts = useMemo(() => {
+    if (aiRules.length > 0) {
+      return dedupeRuleDrafts(batchLlmRulesToDrafts(aiRules));
+    }
+    return dedupeRuleDrafts(buildRuleDraftsFromPreview(suggestedItems));
+  }, [aiRules, suggestedItems]);
+
+  const aiTransactionsPayload = useMemo(
+    () =>
+      JSON.stringify(
+        aiTargetItems.map((item) => ({
+          id: item.transaction.id,
+          description: item.transaction.description,
+          amount: item.transaction.amount,
+          entrySide: item.transaction.entrySide,
+          walletableName: item.walletableName,
+        })),
+      ),
+    [aiTargetItems],
+  );
+
+  const showResults = batchState.status !== "idle" && batchState.results;
+
+  function handleClose() {
+    setAiDismissed(false);
+    onClose();
+  }
 
   return (
-    <Modal isOpen={open} onClose={onClose} size="3xl" scrollBehavior="inside">
+    <Modal isOpen={open} onClose={handleClose} size="3xl" scrollBehavior="inside">
       <ModalContent>
         {(onModalClose) => (
           <>
@@ -138,15 +173,15 @@ export function WalletBatchPanel({
                   <p
                     role="status"
                     className={
-                      state.status === "success"
+                      batchState.status === "success"
                         ? "rounded-lg bg-success-50 px-3 py-2 text-sm text-success-700 dark:bg-success-950/30 dark:text-success-200"
                         : "rounded-lg bg-danger-50 px-3 py-2 text-sm text-danger dark:bg-danger-950/30"
                     }
                   >
-                    {state.message}
+                    {batchState.message}
                   </p>
                   <ul className="divide-y divide-default-200 rounded-lg border border-[var(--freee-border)] text-sm">
-                    {state.results?.map((result) => (
+                    {batchState.results?.map((result) => (
                       <li key={result.description} className="px-3 py-2">
                         <p className="font-semibold">{result.description}</p>
                         <p className="text-xs text-[var(--freee-text-muted)]">
@@ -162,7 +197,7 @@ export function WalletBatchPanel({
               ) : (
                 <>
                   <p className="text-sm leading-relaxed text-[var(--freee-text-muted)]">
-                    freee API では明細の直接登録はできないため、ルール未設定分は自動登録ルールを一括作成し、ルール一致分は freee で確定してください。
+                    ルール未設定分は freee 提案または AI 提案でルールを作成し、ルール一致分は freee で確定してください。
                   </p>
                   <PreviewSection
                     title="ルール一致（freeeで確定）"
@@ -174,6 +209,68 @@ export function WalletBatchPanel({
                   />
                   <PreviewSection title="要手動設定" items={manualItems} />
 
+                  {aiTargetItems.length > 0 ? (
+                    <div className="space-y-2">
+                      <form action={aiFormAction} id="batch-ai-form">
+                        <input type="hidden" name="companyId" value={companyId} />
+                        <input
+                          type="hidden"
+                          name="transactions"
+                          value={aiTransactionsPayload}
+                        />
+                        <Button
+                          type="submit"
+                          variant="bordered"
+                          size="sm"
+                          isLoading={aiPending}
+                        >
+                          AIでルールを提案（{aiTargetItems.length}件）
+                        </Button>
+                      </form>
+                      {aiState.status === "error" ? (
+                        <p role="alert" className="text-xs text-danger">
+                          {aiState.message}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {aiRules.length > 0 ? (
+                    <section className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-xs font-semibold tracking-wide text-[var(--freee-text-muted)]">
+                          AI提案ルール（{aiRules.length}件）
+                        </h3>
+                        <Button
+                          size="sm"
+                          variant="light"
+                          onPress={() => setAiDismissed(true)}
+                        >
+                          AI提案をクリア
+                        </Button>
+                      </div>
+                      <ul className="divide-y divide-default-200 rounded-lg border border-[var(--freee-border)] text-sm">
+                        {aiRules.map((rule) => (
+                          <li key={`${rule.description}-${rule.entrySide}`} className="px-3 py-2">
+                            <p className="font-semibold">
+                              「{rule.description}」
+                              <span className="ml-1 font-normal text-[var(--freee-text-muted)]">
+                                / {MATCHER_CONDITION_LABELS[rule.condition]}
+                              </span>
+                            </p>
+                            <p className="text-xs text-[var(--freee-text-muted)]">
+                              {rule.accountItemName} / {rule.taxName} · 対象{" "}
+                              {rule.transactionIds.length}件
+                            </p>
+                            <p className="mt-1 text-xs leading-relaxed text-[var(--freee-text-muted)]">
+                              {rule.reasoning}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  ) : null}
+
                   {ruleDrafts.length > 0 ? (
                     <form action={formAction} className="space-y-3" id="batch-rule-form">
                       <input type="hidden" name="companyId" value={companyId} />
@@ -181,11 +278,15 @@ export function WalletBatchPanel({
                         type="hidden"
                         name="ruleDrafts"
                         value={JSON.stringify(
-                          buildRuleDraftsFromPreview(suggestedItems),
+                          aiRules.length > 0
+                            ? batchLlmRulesToDrafts(aiRules)
+                            : buildRuleDraftsFromPreview(suggestedItems),
                         )}
                       />
                       <p className="text-xs text-[var(--freee-text-muted)]">
-                        重複する条件は {ruleDrafts.length} 件のルールにまとめて作成します。
+                        {aiRules.length > 0
+                          ? `AI提案を ${ruleDrafts.length} 件のルールにまとめて作成します。`
+                          : `重複する条件は ${ruleDrafts.length} 件のルールにまとめて作成します。`}
                       </p>
                       <Checkbox name="confirmed" value="on">
                         上記のルール内容で一括作成することを確認しました
@@ -193,9 +294,9 @@ export function WalletBatchPanel({
                     </form>
                   ) : null}
 
-                  {state.status === "error" && !showResults ? (
+                  {batchState.status === "error" && !showResults ? (
                     <p role="alert" className="text-sm text-danger">
-                      {state.message}
+                      {batchState.message}
                     </p>
                   ) : null}
                 </>

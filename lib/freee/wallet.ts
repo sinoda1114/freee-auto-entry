@@ -1,4 +1,10 @@
 import type { FreeeAuth } from "./accounting";
+import {
+  e2eUserMatchers,
+  e2eWalletTransactions,
+  isE2ETestMode,
+  mutateE2EUserMatcher,
+} from "@/lib/e2e/fixtures";
 
 const ACCOUNTING_API_BASE = "https://api.freee.co.jp/api/1";
 
@@ -51,6 +57,13 @@ export interface CreateUserMatcherInput {
   accountItemName: string;
   taxName: string;
   walletable?: string;
+}
+
+export interface UpdateUserMatcherInput {
+  active?: boolean;
+  accountItemName?: string;
+  taxName?: string;
+  description?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -170,6 +183,12 @@ export async function getWalletTransactions(
   auth: FreeeAuth,
   pagination: { offset: number; limit: number },
 ): Promise<WalletTransaction[]> {
+  if (isE2ETestMode()) {
+    return e2eWalletTransactions.slice(
+      pagination.offset,
+      pagination.offset + pagination.limit,
+    );
+  }
   const params = new URLSearchParams({
     company_id: auth.companyId,
     offset: String(pagination.offset),
@@ -187,13 +206,36 @@ export async function getWalletTransactions(
 
 export async function getUserMatchers(
   auth: FreeeAuth,
-  pagination: { offset: number; limit: number; act?: number },
+  pagination: {
+    offset: number;
+    limit: number;
+    act?: number;
+    active?: "active" | "inactive" | "all";
+  },
 ): Promise<UserMatcher[]> {
+  if (isE2ETestMode()) {
+    const filtered = e2eUserMatchers.filter((matcher) => {
+      if (pagination.act !== undefined && matcher.act !== pagination.act) {
+        return false;
+      }
+      if (pagination.active === "inactive") {
+        return !matcher.active;
+      }
+      if (pagination.active === "active" || pagination.active === undefined) {
+        return matcher.active;
+      }
+      return true;
+    });
+    return filtered.slice(
+      pagination.offset,
+      pagination.offset + pagination.limit,
+    );
+  }
   const params = new URLSearchParams({
     company_id: auth.companyId,
     offset: String(pagination.offset),
     limit: String(pagination.limit),
-    active: "active",
+    active: pagination.active ?? "active",
   });
   if (pagination.act !== undefined) {
     params.set("act", String(pagination.act));
@@ -209,6 +251,9 @@ export async function createUserMatcher(
   auth: FreeeAuth,
   input: CreateUserMatcherInput,
 ): Promise<{ id: number }> {
+  if (isE2ETestMode()) {
+    return { id: 9000 + Math.floor(Math.random() * 1000) };
+  }
   const params = new URLSearchParams({ company_id: auth.companyId });
   const data = await freeeFetch(auth, `/user_matchers?${params}`, {
     method: "POST",
@@ -230,6 +275,68 @@ export async function createUserMatcher(
     throw new Error("freee user matcher response is invalid");
   }
   return { id: data.id };
+}
+
+export async function getUserMatcherById(
+  auth: FreeeAuth,
+  id: number,
+): Promise<UserMatcher> {
+  if (isE2ETestMode()) {
+    const found = e2eUserMatchers.find((m) => m.id === id);
+    if (!found) {
+      throw new Error(`E2E matcher not found: ${id}`);
+    }
+    return { ...found };
+  }
+  const params = new URLSearchParams({ company_id: auth.companyId });
+  const data = await freeeFetch(auth, `/user_matchers/${id}?${params}`);
+  return parseUserMatcher(data);
+}
+
+export async function updateUserMatcher(
+  auth: FreeeAuth,
+  matcher: UserMatcher,
+  updates: UpdateUserMatcherInput,
+): Promise<UserMatcher> {
+  const merged: UserMatcher = {
+    ...matcher,
+    active: updates.active ?? matcher.active,
+    description: updates.description ?? matcher.description,
+    accountItemName: updates.accountItemName ?? matcher.accountItemName,
+    taxName: updates.taxName ?? matcher.taxName,
+  };
+
+  if (isE2ETestMode()) {
+    mutateE2EUserMatcher(merged);
+    return merged;
+  }
+
+  const params = new URLSearchParams({ company_id: auth.companyId });
+  const body: Record<string, unknown> = {
+    act: matcher.act,
+    active: merged.active,
+    condition: matcher.condition,
+    description: merged.description,
+    entry_side_str: matcher.entrySide,
+    priority: matcher.priority,
+    qualified_invoice_setting: "non_qualified",
+    suggest_tax_from_walletable_invoice: false,
+  };
+  if (merged.accountItemName !== undefined) {
+    body.account_item_name = merged.accountItemName;
+  }
+  if (merged.taxName !== undefined) {
+    body.tax_name = merged.taxName;
+  }
+  if (matcher.walletable !== undefined) {
+    body.walletable = matcher.walletable;
+  }
+
+  const data = await freeeFetch(auth, `/user_matchers/${matcher.id}?${params}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+  return parseUserMatcher(data);
 }
 
 const SUGGESTION_MATCHER_ACTS = [0, 1] as const;
@@ -258,6 +365,25 @@ export async function getAllUserMatchersForActs(
     seen.add(matcher.id);
     return true;
   });
+}
+
+export async function getAllUserMatchers(
+  auth: FreeeAuth,
+  options: { active?: "active" | "inactive" | "all" } = {},
+  pageSize = 100,
+): Promise<UserMatcher[]> {
+  const matchers: UserMatcher[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await getUserMatchers(auth, {
+      offset,
+      limit: pageSize,
+      active: options.active ?? "active",
+    });
+    matchers.push(...page);
+    if (page.length < pageSize) {
+      return matchers;
+    }
+  }
 }
 
 export function descriptionMatches(
