@@ -4,6 +4,10 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { Button, Checkbox } from "@heroui/react";
 import NextLink from "next/link";
 import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
+import {
+  isDateInRegistrableRange,
+  type RegistrableDateRange,
+} from "@/lib/freee/company";
 import { parseSuicaCsv } from "@/lib/suica/csv";
 import {
   encodeSuicaHandoffPayload,
@@ -21,22 +25,35 @@ function yen(amount: number): string {
   return `¥${amount.toLocaleString("ja-JP")}`;
 }
 
+function selectableIndexes(
+  items: SuicaTransitItem[],
+  dateRange: RegistrableDateRange | null,
+): number[] {
+  return items
+    .map((item, index) =>
+      isDateInRegistrableRange(item.date, dateRange) ? index : -1,
+    )
+    .filter((index) => index >= 0);
+}
+
 export function SuicaExpenseView({
   items: initialItems,
   accountItems,
   taxCodes,
   defaultAccountItemId,
   defaultTaxCode,
+  dateRange = null,
 }: {
   items: SuicaTransitItem[];
   accountItems: AccountItem[];
   taxCodes: TaxCode[];
   defaultAccountItemId: number | null;
   defaultTaxCode: number | null;
+  dateRange?: RegistrableDateRange | null;
 }) {
   const [items, setItems] = useState<SuicaTransitItem[]>(initialItems);
   const [selected, setSelected] = useState<Set<number>>(
-    () => new Set(initialItems.map((_, i) => i)),
+    () => new Set(selectableIndexes(initialItems, dateRange)),
   );
   const [accountItemId, setAccountItemId] = useState(
     defaultAccountItemId != null ? String(defaultAccountItemId) : "",
@@ -56,9 +73,15 @@ export function SuicaExpenseView({
     [items],
   );
 
+  const inRangeCount = useMemo(
+    () => selectableIndexes(items, dateRange).length,
+    [items, dateRange],
+  );
+  const outOfRangeCount = items.length - inRangeCount;
+
   function replaceItems(next: SuicaTransitItem[]) {
     setItems(next);
-    setSelected(new Set(next.map((_, i) => i)));
+    setSelected(new Set(selectableIndexes(next, dateRange)));
     setState(initialState);
     setProgress(null);
   }
@@ -73,6 +96,8 @@ export function SuicaExpenseView({
   }
 
   function toggle(index: number) {
+    const item = items[index];
+    if (!item || !isDateInRegistrableRange(item.date, dateRange)) return;
     setState(initialState);
     setSelected((prev) => {
       const next = new Set(prev);
@@ -84,7 +109,9 @@ export function SuicaExpenseView({
 
   function toggleAll(checked: boolean) {
     setState(initialState);
-    setSelected(checked ? new Set(items.map((_, i) => i)) : new Set());
+    setSelected(
+      checked ? new Set(selectableIndexes(items, dateRange)) : new Set(),
+    );
   }
 
   async function handleCsvFile(file: File | undefined) {
@@ -95,7 +122,13 @@ export function SuicaExpenseView({
       const text = await file.text();
       const parsed = parseSuicaCsv(text);
       replaceItems(parsed);
-      setCsvInfo(`${file.name} から ${parsed.length} 件読み込みました。`);
+      const ok = selectableIndexes(parsed, dateRange).length;
+      const skipped = parsed.length - ok;
+      setCsvInfo(
+        skipped > 0
+          ? `${file.name} から ${parsed.length} 件読み込み（会計年度外 ${skipped} 件は未選択）`
+          : `${file.name} から ${parsed.length} 件読み込みました。`,
+      );
     } catch (error) {
       setCsvError(
         error instanceof Error ? error.message : "CSV の読み込みに失敗しました。",
@@ -106,7 +139,12 @@ export function SuicaExpenseView({
   }
 
   function handleSubmit() {
-    const indexes = Array.from(selected).sort((a, b) => a - b);
+    const indexes = Array.from(selected)
+      .filter((index) => {
+        const item = items[index];
+        return item != null && isDateInRegistrableRange(item.date, dateRange);
+      })
+      .sort((a, b) => a - b);
     if (indexes.length === 0) return;
 
     startTransition(async () => {
@@ -158,7 +196,6 @@ export function SuicaExpenseView({
           registeredCount: allDealIds.length,
           message: `${allDealIds.length}件の経費を登録しました。`,
         });
-        // 登録済みを選択解除
         setSelected(new Set());
       } catch (error) {
         setProgress(null);
@@ -213,6 +250,13 @@ export function SuicaExpenseView({
         ) : null}
       </div>
 
+      {dateRange ? (
+        <p className="text-xs text-[var(--freee-text-muted)]">
+          登録できる日付: {dateRange.startDate}〜{dateRange.endDate}
+          （現在の会計年度）
+        </p>
+      ) : null}
+
       {items.length === 0 ? (
         <div className="space-y-3">
           <p className="text-sm text-[var(--freee-text-muted)]">
@@ -225,45 +269,65 @@ export function SuicaExpenseView({
         </div>
       ) : (
         <>
+          {outOfRangeCount > 0 ? (
+            <p className="text-sm text-amber-700 dark:text-amber-400" role="status">
+              会計年度外の明細が {outOfRangeCount}{" "}
+              件あります（選択不可）。期首以降だけ登録できます。
+            </p>
+          ) : null}
+
           <div className="flex items-center justify-between gap-2">
             <Checkbox
-              isSelected={selected.size === items.length && items.length > 0}
+              isSelected={
+                inRangeCount > 0 && selected.size === inRangeCount
+              }
               isIndeterminate={
-                selected.size > 0 && selected.size < items.length
+                selected.size > 0 && selected.size < inRangeCount
               }
               onValueChange={toggleAll}
             >
-              すべて選択（{selected.size}/{items.length}）
+              年度内をすべて選択（{selected.size}/{inRangeCount}）
             </Checkbox>
           </div>
 
           <ul className="divide-y divide-[var(--freee-border)]">
-            {items.map((item, index) => (
-              <li
-                key={`${item.sequence}-${item.date}-${index}`}
-                className="py-3"
-              >
-                <Checkbox
-                  isSelected={selected.has(index)}
-                  onValueChange={() => toggle(index)}
-                  classNames={{ label: "w-full" }}
+            {items.map((item, index) => {
+              const inRange = isDateInRegistrableRange(item.date, dateRange);
+              return (
+                <li
+                  key={`${item.sequence}-${item.date}-${index}`}
+                  className="py-3"
                 >
-                  <div className="flex w-full items-start justify-between gap-3 text-sm">
-                    <div>
-                      <div className="font-medium text-[var(--freee-text)]">
-                        {item.description}
+                  <Checkbox
+                    isSelected={selected.has(index)}
+                    isDisabled={!inRange}
+                    onValueChange={() => toggle(index)}
+                    classNames={{ label: "w-full" }}
+                  >
+                    <div className="flex w-full items-start justify-between gap-3 text-sm">
+                      <div>
+                        <div
+                          className={
+                            inRange
+                              ? "font-medium text-[var(--freee-text)]"
+                              : "font-medium text-[var(--freee-text-muted)] line-through"
+                          }
+                        >
+                          {item.description}
+                        </div>
+                        <div className="text-[var(--freee-text-muted)]">
+                          {item.date}
+                          {!inRange ? "（会計年度外）" : ""}
+                        </div>
                       </div>
-                      <div className="text-[var(--freee-text-muted)]">
-                        {item.date}
+                      <div className="shrink-0 font-medium">
+                        {yen(item.amount)}
                       </div>
                     </div>
-                    <div className="shrink-0 font-medium">
-                      {yen(item.amount)}
-                    </div>
-                  </div>
-                </Checkbox>
-              </li>
-            ))}
+                  </Checkbox>
+                </li>
+              );
+            })}
           </ul>
 
           <div className="grid gap-3 sm:grid-cols-2">
