@@ -1,6 +1,12 @@
 "use server";
 
 import { createDeal } from "@/lib/freee/accounting";
+import {
+  formatDealCreateError,
+  getCompanyFiscalYears,
+  isDateInRegistrableRange,
+  resolveRegistrableDateRange,
+} from "@/lib/freee/company";
 import { getAppMemoTagId } from "@/lib/freee/memo-tag";
 import { getValidFreeeAuth } from "@/lib/freee/session-client";
 import {
@@ -64,6 +70,24 @@ export async function createSuicaExpensesAction(
     };
   }
 
+  let dateRange = null;
+  try {
+    const fiscalYears = await getCompanyFiscalYears(auth);
+    dateRange = resolveRegistrableDateRange(fiscalYears);
+  } catch {
+    // 年度取得失敗時は freee 側バリデーションに委ねる
+  }
+
+  const outOfRange = selected.filter(
+    (item) => !isDateInRegistrableRange(item.date, dateRange),
+  );
+  if (outOfRange.length > 0 && dateRange) {
+    return {
+      status: "error",
+      message: `会計年度（${dateRange.startDate}〜${dateRange.endDate}）の外の明細が ${outOfRange.length} 件あります。対象期間内だけ選んでください。`,
+    };
+  }
+
   const dealIds: number[] = [];
   try {
     const memoTagId = await getAppMemoTagId(auth);
@@ -85,8 +109,8 @@ export async function createSuicaExpensesAction(
       message: `${dealIds.length}件の経費を登録しました。`,
     };
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "不明なエラーです。";
+    const raw = error instanceof Error ? error.message : "不明なエラーです。";
+    const message = formatDealCreateError(raw);
     if (dealIds.length > 0) {
       return {
         status: "error",

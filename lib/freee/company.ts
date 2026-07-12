@@ -1,3 +1,5 @@
+import type { FreeeAuth } from "@/lib/freee/accounting";
+
 const ACCOUNTING_API_BASE = "https://api.freee.co.jp/api/1";
 
 export interface FreeeCompany {
@@ -6,10 +8,29 @@ export interface FreeeCompany {
   displayName: string | null;
 }
 
+export interface FiscalYear {
+  id: number;
+  startDate: string;
+  endDate: string;
+  isClosed: boolean;
+}
+
+export interface RegistrableDateRange {
+  startDate: string;
+  endDate: string;
+}
+
 interface RawCompany {
   id: number;
   name: string;
   display_name: string | null;
+}
+
+interface RawFiscalYear {
+  id: number;
+  start_date: string;
+  end_date: string;
+  is_closed: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -22,6 +43,16 @@ function isRawCompany(value: unknown): value is RawCompany {
     typeof value.id === "number" &&
     typeof value.name === "string" &&
     (typeof value.display_name === "string" || value.display_name === null)
+  );
+}
+
+function isRawFiscalYear(value: unknown): value is RawFiscalYear {
+  return (
+    isRecord(value) &&
+    typeof value.id === "number" &&
+    typeof value.start_date === "string" &&
+    typeof value.end_date === "string" &&
+    typeof value.is_closed === "boolean"
   );
 }
 
@@ -55,4 +86,85 @@ export async function getCompanies(accessToken: string): Promise<FreeeCompany[]>
     name: company.name,
     displayName: company.display_name,
   }));
+}
+
+/**
+ * 事業所詳細から会計年度一覧を取得する。
+ * (GET /api/1/companies/{id})
+ */
+export async function getCompanyFiscalYears(
+  auth: FreeeAuth,
+): Promise<FiscalYear[]> {
+  const res = await fetch(
+    `${ACCOUNTING_API_BASE}/companies/${auth.companyId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${auth.accessToken}`,
+      },
+    },
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(
+      `freee company detail API request failed: ${res.status} ${text}`,
+    );
+  }
+
+  const data: unknown = await res.json();
+  if (
+    !isRecord(data) ||
+    !isRecord(data.company) ||
+    !Array.isArray(data.company.fiscal_years) ||
+    !data.company.fiscal_years.every(isRawFiscalYear)
+  ) {
+    throw new Error("freee company detail API response is invalid");
+  }
+
+  return data.company.fiscal_years.map((fy) => ({
+    id: fy.id,
+    startDate: fy.start_date,
+    endDate: fy.end_date,
+    isClosed: fy.is_closed,
+  }));
+}
+
+/** 取引登録可能な会計年度の日付範囲（未締め優先、当日を含む年度を優先） */
+export function resolveRegistrableDateRange(
+  fiscalYears: FiscalYear[],
+  todayIsoDate: string = new Date().toISOString().slice(0, 10),
+): RegistrableDateRange | null {
+  if (fiscalYears.length === 0) return null;
+
+  const openYears = fiscalYears.filter((fy) => !fy.isClosed);
+  const pool = openYears.length > 0 ? openYears : fiscalYears;
+
+  const containing = pool.find(
+    (fy) => fy.startDate <= todayIsoDate && fy.endDate >= todayIsoDate,
+  );
+  const selected =
+    containing ??
+    [...pool].sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
+
+  if (!selected) return null;
+  return { startDate: selected.startDate, endDate: selected.endDate };
+}
+
+export function isDateInRegistrableRange(
+  date: string,
+  range: RegistrableDateRange | null,
+): boolean {
+  if (!range) return true;
+  return date >= range.startDate && date <= range.endDate;
+}
+
+/** freee の期首エラーなどをユーザー向けに短くする */
+export function formatDealCreateError(raw: string): string {
+  if (raw.includes("期首日以前")) {
+    return "会計年度の期首より前の日付は登録できません。期首日以降の明細だけ選んでください。";
+  }
+  if (raw.includes("期末日") || raw.includes("会計期間外")) {
+    return "会計年度の範囲外の日付は登録できません。対象年度内の明細だけ選んでください。";
+  }
+  return raw;
 }
