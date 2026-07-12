@@ -4,7 +4,7 @@ import { appPageTitle } from "@/lib/app-brand";
 import { listRecurringInvoiceTemplates } from "@/lib/db/recurring-invoices";
 import { hasInvoiceGeneration } from "@/lib/db/recurring-invoices";
 import { getDatabase } from "@/lib/db/turso";
-import { getInvoices } from "@/lib/freee/invoice";
+import { getUnsentInvoiceCount } from "@/lib/freee/invoice";
 import {
   currentTargetMonth,
   formatTargetMonth,
@@ -61,17 +61,6 @@ async function fetchPendingTemplates(
   return results.filter((t): t is RecurringInvoiceTemplate => t !== null);
 }
 
-async function fetchUnsentInvoiceCount(
-  auth: { accessToken: string; companyId: string },
-): Promise<number> {
-  if (isE2ETestMode()) {
-    return e2eInvoiceSummaries.filter((i) => i.sendingStatus === "unsent")
-      .length;
-  }
-  const invoices = await getInvoices(auth, { offset: 0, limit: PAGE_SIZE });
-  return invoices.filter((i) => i.sendingStatus === "unsent").length;
-}
-
 export default async function MonthlyClosePage() {
   const auth = await getValidFreeeAuth();
   if (!auth) {
@@ -90,7 +79,11 @@ export default async function MonthlyClosePage() {
     await Promise.allSettled([
       fetchUnprocessedWalletTxnCount(auth),
       fetchPendingTemplates(auth, targetMonth),
-      fetchUnsentInvoiceCount(auth),
+      isE2ETestMode()
+        ? e2eInvoiceSummaries.filter(
+            (invoice) => invoice.sendingStatus === "unsent",
+          ).length
+        : getUnsentInvoiceCount(auth, PAGE_SIZE),
     ]);
 
   return (

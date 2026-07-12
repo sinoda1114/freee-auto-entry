@@ -2,6 +2,8 @@
 /** @typedef {import('@playwright/test').Route} Route */
 
 export const E2E_COMPANY_ID = "11122591";
+const E2E_BOOTSTRAP_TOKEN =
+  process.env.E2E_BOOTSTRAP_TOKEN ?? "e2e-bootstrap-token";
 
 const accountItems = [
   { id: 1, name: "通信費", available: true, default_tax_code: 136 },
@@ -180,7 +182,11 @@ export async function registerFreeeApiMocks(page) {
 
 /** @param {Page} page */
 export async function bootstrapE2ESession(page) {
-  const response = await page.request.post("/api/e2e/bootstrap");
+  const response = await page.request.post("/api/e2e/bootstrap", {
+    headers: {
+      Authorization: `Bearer ${E2E_BOOTSTRAP_TOKEN}`,
+    },
+  });
   if (!response.ok()) {
     throw new Error(`E2E bootstrap failed: ${response.status()}`);
   }

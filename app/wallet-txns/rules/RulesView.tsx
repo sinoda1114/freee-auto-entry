@@ -1,7 +1,15 @@
 "use client";
 
 import { Button, Chip, Input } from "@heroui/react";
-import { useActionState, useMemo, useOptimistic, useState, useTransition } from "react";
+import {
+  Fragment,
+  useActionState,
+  useEffect,
+  useMemo,
+  useOptimistic,
+  useState,
+  useTransition,
+} from "react";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
 import {
@@ -71,9 +79,11 @@ function EditMatcherRow({
     initialState,
   );
 
-  if (state.status === "success") {
-    onClose();
-  }
+  useEffect(() => {
+    if (state.status === "success") {
+      onClose();
+    }
+  }, [onClose, state.status]);
 
   return (
     <tr className="bg-default-50">
@@ -303,9 +313,8 @@ export function RulesView({ matchers, history = [] }: RulesViewProps) {
               </thead>
               <tbody className="divide-y divide-default-200">
                 {filtered.map((matcher) => (
-                  <>
+                  <Fragment key={matcher.id}>
                     <tr
-                      key={matcher.id}
                       className={`align-top ${!matcher.active ? "opacity-50" : ""}`}
                     >
                       <td className="px-3 py-2 font-mono tabular-nums">
@@ -360,12 +369,11 @@ export function RulesView({ matchers, history = [] }: RulesViewProps) {
                     </tr>
                     {editingId === matcher.id && (
                       <EditMatcherRow
-                        key={`edit-${matcher.id}`}
                         matcher={matcher}
                         onClose={() => setEditingId(null)}
                       />
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>

@@ -201,6 +201,22 @@ export async function getInvoices(
   return data.invoices.map(parseInvoiceSummary);
 }
 
+export async function getUnsentInvoiceCount(
+  auth: FreeeAuth,
+  pageSize = 100,
+): Promise<number> {
+  let count = 0;
+  for (let offset = 0; ; offset += pageSize) {
+    const invoices = await getInvoices(auth, { offset, limit: pageSize });
+    count += invoices.filter(
+      (invoice) => invoice.sendingStatus === "unsent",
+    ).length;
+    if (invoices.length < pageSize) {
+      return count;
+    }
+  }
+}
+
 function parseSendingMethod(
   value: unknown,
 ): "email" | "posting" | "email_and_posting" {

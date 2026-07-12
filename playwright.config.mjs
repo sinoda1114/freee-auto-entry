@@ -1,6 +1,8 @@
 /** @type {import('@playwright/test').PlaywrightTestConfig} */
 const PORT = process.env.E2E_PORT ?? "3000";
 const baseURL = `http://127.0.0.1:${PORT}`;
+const bootstrapToken =
+  process.env.E2E_BOOTSTRAP_TOKEN ?? "e2e-bootstrap-token";
 
 const config = {
   testDir: "./e2e",
@@ -33,6 +35,7 @@ if (process.env.E2E_SKIP_WEBSERVER !== "1") {
     env: {
       ...process.env,
       E2E_TEST_MODE: "1",
+      E2E_BOOTSTRAP_TOKEN: bootstrapToken,
       AUTH_SECRET: process.env.AUTH_SECRET ?? "e2e-test-auth-secret-32chars-min!!",
       NEXT_PUBLIC_SITE_URL: baseURL,
       FREEE_CLIENT_ID: "e2e-client-id",
