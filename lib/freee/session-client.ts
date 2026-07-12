@@ -118,8 +118,10 @@ export const getValidFreeeAuth = cache(async (): Promise<FreeeAuth | null> => {
   }
 
   // RSC では refresh 前に cookie 書き込み可否を確認する（refresh token 消費を防ぐ）。
+  // RSC では refresh 前に cookie 書き込み可否を確認する（refresh token 消費を防ぐ）。
   try {
-    await session.save();
+    // Check if we're in a render context by attempting a noop headers() call
+    await headers();
   } catch (error) {
     if (isCookieMutationForbiddenError(error)) {
       await redirectToSessionRefresh();
