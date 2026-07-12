@@ -11,8 +11,8 @@ android {
         applicationId = "app.smartkeiri.suica"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // 本番デフォルト。ローカル検証時は -PSITE_URL=http://10.0.2.2:3000 などで上書き
