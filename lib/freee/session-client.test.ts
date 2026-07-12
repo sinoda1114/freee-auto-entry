@@ -81,7 +81,7 @@ describe("getValidFreeeAuth", () => {
       clientSecret: "secret-1",
       refreshToken: "refresh-1",
     });
-    expect(session.save).toHaveBeenCalledTimes(2);
+    expect(session.save).toHaveBeenCalledTimes(1);
     expect(auth).toEqual({ accessToken: "new-token", companyId: "999" });
   });
 
@@ -91,17 +91,19 @@ describe("getValidFreeeAuth", () => {
       refreshToken: "refresh-1",
       companyId: "999",
       expiresAt: Date.now() - 1000,
-      save: vi.fn().mockRejectedValue(
+      save: vi.fn().mockResolvedValue(undefined),
+    };
+    getSessionMock.mockResolvedValue(session);
+    headersMock
+      .mockRejectedValueOnce(
         new Error(
           "Cookies can only be modified in a Server Action or Route Handler.",
         ),
-      ),
-    };
-    getSessionMock.mockResolvedValue(session);
-    headersMock.mockResolvedValue({
-      get: (name: string) =>
-        name === "x-pathname" ? "/expenses/new" : null,
-    });
+      )
+      .mockResolvedValueOnce({
+        get: (name: string) =>
+          name === "x-pathname" ? "/expenses/new" : null,
+      });
 
     await expect(getValidFreeeAuth()).rejects.toThrow("NEXT_REDIRECT");
     expect(refreshAccessTokenMock).not.toHaveBeenCalled();
@@ -165,7 +167,7 @@ describe("getValidFreeeAuth", () => {
       companyId: "888",
       accessToken: "other-token",
     });
-    expect(session.save).toHaveBeenCalledTimes(2);
+    expect(session.save).toHaveBeenCalledTimes(1);
   });
 });
 
