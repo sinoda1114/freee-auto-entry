@@ -381,9 +381,37 @@ export function SuicaExpenseView({
             </p>
           ) : null}
           {state.status === "success" ? (
-            <p className="text-sm text-green-700" role="status">
-              {state.message}
-            </p>
+            <div className="space-y-2 rounded-md border border-green-600/40 bg-green-50 px-3 py-3 text-sm text-green-800 dark:bg-green-950/40 dark:text-green-200">
+              <p role="status" className="font-medium">
+                {state.message}
+              </p>
+              <p>
+                freee
+                会計に支出取引として保存済みです。確認は次のどちらかです。
+              </p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>
+                  <a
+                    className="underline underline-offset-2"
+                    href="https://secure.freee.co.jp/deals"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    freee会計の「取引」一覧を開く
+                  </a>
+                  （摘要に「Suica」と出ていれば成功）
+                </li>
+                {state.dealIds && state.dealIds.length > 0 ? (
+                  <li>
+                    取引ID（先頭最大5件）:{" "}
+                    {state.dealIds.slice(0, 5).join(", ")}
+                    {state.dealIds.length > 5
+                      ? ` ほか${state.dealIds.length - 5}件`
+                      : ""}
+                  </li>
+                ) : null}
+              </ul>
+            </div>
           ) : null}
 
           <Button
