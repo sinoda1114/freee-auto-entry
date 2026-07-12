@@ -83,6 +83,13 @@ export function SuicaExpenseView({
       );
       const result = await createSuicaExpensesAction(state, fd);
       setState(result);
+      if (result.registeredIndexes?.length) {
+        setSelected((prev) => {
+          const next = new Set(prev);
+          for (const i of result.registeredIndexes!) next.delete(i);
+          return next;
+        });
+      }
     });
   }
 
@@ -176,6 +183,14 @@ export function SuicaExpenseView({
       {state.status === "error" ? (
         <p className="text-sm text-red-600" role="alert">
           {state.message}
+        </p>
+      ) : null}
+      {state.status === "partial" ? (
+        <p className="text-sm text-amber-600" role="alert">
+          {state.message}
+          {state.dealIds?.length
+            ? `（登録済み取引ID: ${state.dealIds.join(", ")}）`
+            : null}
         </p>
       ) : null}
       {state.status === "success" ? (

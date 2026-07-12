@@ -208,4 +208,13 @@ describe("pickTravelAccountItemId", () => {
       ]),
     ).toBe(2);
   });
+
+  it("returns null when no travel-like account matches", () => {
+    expect(
+      pickTravelAccountItemId([
+        { id: 1, name: "売上高" },
+        { id: 2, name: "仕入高" },
+      ]),
+    ).toBeNull();
+  });
 });
