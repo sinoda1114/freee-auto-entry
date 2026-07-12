@@ -32,15 +32,14 @@ export function ExpensePageView({
         description="領収書をカメラ撮影または選択すると OCR で自動入力し、freee 会計へ登録します。"
       />
       <p className="mt-3 text-sm text-[var(--freee-text-muted)]">
-        物理 Suica の交通履歴から登録する場合は、Android アプリ「スマート経理
-        Suica」でかざしたあと、ブラウザで{" "}
+        Suica の履歴は{" "}
         <NextLink
           href="/expenses/suica"
           className="text-freee-blue underline-offset-2 hover:underline"
         >
           Suica経費登録
         </NextLink>
-        が開きます。
+        で CSV 取り込み（または Android でかざし）できます。
       </p>
       <div className="panel mt-4 px-4 py-4">
         <ExpenseForm accountItems={accountItems} taxCodes={taxCodes} />

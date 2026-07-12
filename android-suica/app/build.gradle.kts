@@ -11,8 +11,8 @@ android {
         applicationId = "app.smartkeiri.suica"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // SITE_URL は gradle.properties（設定）で管理する。build ロジックには

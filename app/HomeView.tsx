@@ -69,7 +69,7 @@ function WorkflowCard({ item }: { item: Workflow }) {
       <span
         className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
           isAccounting
-            ? "bg-freee-blue/15 text-freee-blue"
+            ? "bg-freee-blue-soft text-freee-blue"
             : "bg-freee-billing-soft text-freee-billing"
         }`}
       >

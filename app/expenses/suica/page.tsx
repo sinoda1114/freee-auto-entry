@@ -3,6 +3,10 @@ import { AuthGate } from "@/app/components/AuthGate";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
 import { getAccountItems, getTaxCodes } from "@/lib/freee/accounting";
+import {
+  getCompanyFiscalYears,
+  resolveRegistrableDateRange,
+} from "@/lib/freee/company";
 import { isExpenseCompany } from "@/lib/freee/company-policy";
 import {
   getConnectedCompanies,
@@ -68,10 +72,12 @@ export default async function SuicaExpensePage({
     );
   }
 
-  const [accountItems, taxCodes] = await Promise.all([
+  const [accountItems, taxCodes, fiscalYears] = await Promise.all([
     getAccountItems(auth),
     getTaxCodes(auth),
+    getCompanyFiscalYears(auth).catch(() => []),
   ]);
+  const dateRange = resolveRegistrableDateRange(fiscalYears);
   const defaultAccountItemId = pickTravelAccountItemId(accountItems);
   const defaultAccount = accountItems.find(
     (item) => item.id === defaultAccountItemId,
@@ -92,7 +98,7 @@ export default async function SuicaExpensePage({
       </Link>
       <PageHeader
         title="Suica交通履歴から経費登録"
-        description="Androidアプリでかざして選んだ交通履歴を、旅費交通費として freee に登録します。"
+        description="CSVの取り込み、または Android アプリでかざした履歴から、旅費交通費として freee に登録します。"
       />
       {payloadError ? (
         <p className="mt-4 text-sm text-red-600" role="alert">
@@ -105,6 +111,7 @@ export default async function SuicaExpensePage({
         taxCodes={taxCodes}
         defaultAccountItemId={defaultAccountItemId}
         defaultTaxCode={defaultTaxCode}
+        dateRange={dateRange}
       />
     </PageShell>
   );
