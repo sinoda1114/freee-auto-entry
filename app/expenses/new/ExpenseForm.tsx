@@ -1,7 +1,15 @@
 "use client";
 
-import { useActionState, useRef, useState, useTransition } from "react";
+import {
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
+import { Button } from "@heroui/react";
 import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
+import type { OcrResult } from "@/lib/ai/receipt-ocr";
 import {
   createExpenseAction,
   ocrReceiptAction,
@@ -12,6 +20,10 @@ const initialState: ExpenseFormState = { status: "idle" };
 
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function isImageFile(file: File): boolean {
+  return file.type.startsWith("image/");
 }
 
 export function ExpenseForm({
@@ -35,8 +47,19 @@ export function ExpenseForm({
   const [receiptId, setReceiptId] = useState<number | null>(null);
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrDone, setOcrDone] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const ocrRequestIdRef = useRef(0);
+  const selectedFileRef = useRef<File | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   function handleAccountItemChange(value: string) {
     setAccountItemId(value);
@@ -49,19 +72,34 @@ export function ExpenseForm({
     }
   }
 
-  function handleOcrClick() {
-    const file = fileInputRef.current?.files?.[0];
-    if (!file) {
-      setOcrError("ファイルを選択してください。");
-      return;
+  function applyOcrResult(ocr: OcrResult) {
+    if (ocr.issueDate) setIssueDate(ocr.issueDate);
+    if (ocr.amount) setAmount(String(ocr.amount));
+    if (ocr.description) setDescription(ocr.description);
+    if (ocr.accountItemName) {
+      const matched = accountItems.find((i) => i.name === ocr.accountItemName);
+      if (matched) {
+        setAccountItemId(String(matched.id));
+        const defaultTax = taxCodes.find(
+          (t) => t.code === matched.defaultTaxCode,
+        );
+        if (defaultTax) setTaxCode(String(defaultTax.code));
+      }
     }
+  }
+
+  function runOcr(file: File) {
+    const requestId = ++ocrRequestIdRef.current;
     setOcrError(null);
     setOcrDone(false);
+    setReceiptId(null);
 
     startOcrTransition(async () => {
       const fd = new FormData();
       fd.append("file", file);
       const result = await ocrReceiptAction(fd);
+
+      if (requestId !== ocrRequestIdRef.current) return;
 
       if (result.status === "error") {
         setOcrError(result.message ?? "OCR読み取りに失敗しました。");
@@ -69,62 +107,145 @@ export function ExpenseForm({
       }
 
       if (result.receiptId) setReceiptId(result.receiptId);
-
-      const ocr = result.ocrResult;
-      if (ocr) {
-        if (ocr.issueDate) setIssueDate(ocr.issueDate);
-        if (ocr.amount) setAmount(String(ocr.amount));
-        if (ocr.description) setDescription(ocr.description);
-        if (ocr.accountItemName) {
-          const matched = accountItems.find(
-            (i) => i.name === ocr.accountItemName,
-          );
-          if (matched) {
-            setAccountItemId(String(matched.id));
-            const defaultTax = taxCodes.find(
-              (t) => t.code === matched.defaultTaxCode,
-            );
-            if (defaultTax) setTaxCode(String(defaultTax.code));
-          }
-        }
-      }
-
+      if (result.ocrResult) applyOcrResult(result.ocrResult);
       setOcrDone(true);
     });
   }
 
+  function handleFileSelected(file: File | undefined) {
+    if (!file) return;
+
+    selectedFileRef.current = file;
+    setSelectedFile(file);
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return isImageFile(file) ? URL.createObjectURL(file) : null;
+    });
+    runOcr(file);
+  }
+
+  function handleRetryOcr() {
+    const file = selectedFileRef.current;
+    if (!file) {
+      setOcrError("ファイルを選択してください。");
+      return;
+    }
+    runOcr(file);
+  }
+
   return (
     <form action={formAction} className="flex flex-col gap-4">
-      {/* 証憑ファイルアップロード */}
-      <div className="flex flex-col gap-2 rounded border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
+      <div className="flex flex-col gap-3 rounded border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
         <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
           領収書・証憑（任意）
         </span>
+
         <input
-          ref={fileInputRef}
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="sr-only"
+          onChange={(e) => {
+            handleFileSelected(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+        <input
+          ref={galleryInputRef}
           type="file"
           accept="image/*,application/pdf"
-          className="text-sm text-zinc-700 dark:text-zinc-300 file:mr-2 file:rounded file:border-0 file:bg-zinc-100 file:px-3 file:py-1 file:text-sm dark:file:bg-zinc-800"
+          className="sr-only"
+          onChange={(e) => {
+            handleFileSelected(e.target.files?.[0]);
+            e.target.value = "";
+          }}
         />
-        <button
-          type="button"
-          disabled={isOcrPending}
-          onClick={handleOcrClick}
-          className="w-fit rounded bg-zinc-100 px-4 py-1.5 text-sm text-zinc-700 hover:bg-zinc-200 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-        >
-          {isOcrPending ? "読み取り中..." : "OCRで自動入力"}
-        </button>
-        {ocrError && (
-          <p className="text-sm text-red-600 dark:text-red-400">{ocrError}</p>
-        )}
-        {ocrDone && !ocrError && (
-          <p className="text-sm text-green-600 dark:text-green-400">
-            読み取り完了。内容を確認してから登録してください。
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            color="primary"
+            isDisabled={isOcrPending}
+            onPress={() => cameraInputRef.current?.click()}
+          >
+            カメラで撮影
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="bordered"
+            isDisabled={isOcrPending}
+            className="border-[var(--freee-border)] text-[var(--freee-text)]"
+            onPress={() => galleryInputRef.current?.click()}
+          >
+            写真を選ぶ
+          </Button>
+        </div>
+
+        {selectedFile ? (
+          <div className="flex flex-col gap-2">
+            {previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- blob preview URL
+              <img
+                src={previewUrl}
+                alt="選択した領収書のプレビュー"
+                className="max-h-48 w-auto rounded border border-zinc-200 object-contain dark:border-zinc-700"
+              />
+            ) : (
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                {selectedFile.name}
+              </p>
+            )}
+
+            {isOcrPending ? (
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                読み取り中...
+              </p>
+            ) : null}
+
+            {ocrError ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {ocrError}
+                </p>
+                <button
+                  type="button"
+                  disabled={isOcrPending}
+                  onClick={handleRetryOcr}
+                  className="w-fit text-sm text-zinc-600 underline hover:text-zinc-800 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-200"
+                >
+                  再読み取り
+                </button>
+              </div>
+            ) : null}
+
+            {ocrDone && !ocrError ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-sm text-green-600 dark:text-green-400">
+                  読み取り完了。内容を確認してから登録してください。
+                </p>
+                <button
+                  type="button"
+                  disabled={isOcrPending}
+                  onClick={handleRetryOcr}
+                  className="text-sm text-zinc-500 underline hover:text-zinc-700 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-200"
+                >
+                  再読み取り
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-xs text-zinc-500 dark:text-zinc-500">
+            撮影または選択すると自動で読み取ります。
           </p>
         )}
-        {receiptId && (
+
+        {receiptId ? (
           <input type="hidden" name="receiptId" value={receiptId} />
-        )}
+        ) : null}
       </div>
 
       <label className="flex flex-col gap-1">
@@ -212,7 +333,7 @@ export function ExpenseForm({
 
       <button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || isOcrPending}
         className="rounded-full bg-foreground px-5 py-3 text-background disabled:opacity-50"
       >
         {isPending ? "登録中..." : "登録する"}
