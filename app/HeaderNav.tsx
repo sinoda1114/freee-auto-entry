@@ -39,8 +39,8 @@ export function isNavItemActive(pathname: string, href: string): boolean {
 function navLinkClass(active: boolean, domain: NavDomain): string {
   if (active) {
     return domain === "accounting"
-      ? "bg-[var(--freee-blue)]/10 text-[var(--freee-blue)]"
-      : "bg-[var(--freee-billing)]/10 text-[var(--freee-billing)]";
+      ? "bg-freee-blue/10 text-freee-blue"
+      : "bg-freee-billing/10 text-freee-billing";
   }
   return "text-[var(--freee-text-muted)] hover:bg-[var(--freee-bg)] hover:text-[var(--freee-text)]";
 }
