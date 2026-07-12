@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 
-export async function POST() {
+export async function POST(request: Request) {
   if (process.env.E2E_TEST_MODE !== "1") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const authHeader = request.headers.get("authorization");
+  const expectedToken = process.env.E2E_BOOTSTRAP_TOKEN;
+  
+  if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const session = await getSession();
