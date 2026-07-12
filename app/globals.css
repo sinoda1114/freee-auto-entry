@@ -7,6 +7,7 @@
   color-scheme: light;
   --freee-blue: #2864f0;
   --freee-blue-dark: #1e4fc4;
+  --freee-blue-soft: #dbeafe;
   --freee-billing: #0f766e;
   --freee-billing-soft: #ccfbf1;
   --freee-bg: #f5f7fa;
@@ -26,6 +27,7 @@
   color-scheme: dark;
   --freee-blue: #5b8df7;
   --freee-blue-dark: #2864f0;
+  --freee-blue-soft: color-mix(in srgb, #2864f0 35%, transparent);
   --freee-billing: #2dd4bf;
   --freee-billing-soft: color-mix(in srgb, #0f766e 35%, transparent);
   --freee-bg: #0f1419;
@@ -40,6 +42,7 @@
   --foreground: var(--freee-text);
   /* @theme 由来のユーティリティ色も dark で上書き */
   --color-freee-blue: #5b8df7;
+  --color-freee-blue-soft: color-mix(in srgb, #2864f0 35%, transparent);
   --color-freee-billing: #2dd4bf;
   --color-freee-billing-soft: color-mix(in srgb, #0f766e 35%, transparent);
 }
@@ -48,6 +51,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-freee-blue: #2864f0;
+  --color-freee-blue-soft: #dbeafe;
   --color-freee-billing: #0f766e;
   --color-freee-billing-soft: #ccfbf1;
   --color-freee-surface: var(--freee-surface);
