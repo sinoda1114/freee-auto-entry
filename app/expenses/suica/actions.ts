@@ -8,10 +8,15 @@ import {
   type SuicaTransitItem,
 } from "@/lib/suica/history";
 
+/** 1リクエストあたりの上限（Vercel / freee タイムアウト回避） */
+export const SUICA_EXPENSE_BATCH_LIMIT = 15;
+
 export interface SuicaExpenseFormState {
   status: "idle" | "success" | "error";
   message?: string;
   dealIds?: number[];
+  /** 成功した件数（部分成功時も） */
+  registeredCount?: number;
 }
 
 export async function createSuicaExpensesAction(
@@ -59,9 +64,16 @@ export async function createSuicaExpensesAction(
     return { status: "error", message: "登録する明細を選択してください。" };
   }
 
+  if (selected.length > SUICA_EXPENSE_BATCH_LIMIT) {
+    return {
+      status: "error",
+      message: `1回あたり最大 ${SUICA_EXPENSE_BATCH_LIMIT} 件までです（今回 ${selected.length} 件）。画面側で分割して再送してください。`,
+    };
+  }
+
+  const dealIds: number[] = [];
   try {
     const memoTagId = await getAppMemoTagId(auth);
-    const dealIds: number[] = [];
     for (const item of selected) {
       const deal = await createDeal(auth, {
         issueDate: item.date,
@@ -76,11 +88,20 @@ export async function createSuicaExpensesAction(
     return {
       status: "success",
       dealIds,
+      registeredCount: dealIds.length,
       message: `${dealIds.length}件の経費を登録しました。`,
     };
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "不明なエラーです。";
+    if (dealIds.length > 0) {
+      return {
+        status: "error",
+        dealIds,
+        registeredCount: dealIds.length,
+        message: `${dealIds.length}件まで登録したあと失敗しました: ${message}`,
+      };
+    }
     return { status: "error", message };
   }
 }
