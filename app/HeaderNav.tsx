@@ -4,15 +4,26 @@ import { NavbarItem } from "@heroui/react";
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 
-const navigation = [
+const baseNavigation = [
   { href: "/monthly-close", label: "月次" },
   { href: "/wallet-txns", label: "未処理明細" },
   { href: "/recurring-invoices", label: "定型請求" },
   { href: "/invoices", label: "請求書" },
 ] as const;
 
-export function HeaderNav() {
+export function HeaderNav({
+  canRegisterExpense = false,
+}: {
+  canRegisterExpense?: boolean;
+}) {
   const pathname = usePathname();
+  const navigation = canRegisterExpense
+    ? [
+        ...baseNavigation.slice(0, 2),
+        { href: "/expenses/new", label: "経費" },
+        ...baseNavigation.slice(2),
+      ]
+    : [...baseNavigation];
 
   return (
     <>
