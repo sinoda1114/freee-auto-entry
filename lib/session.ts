@@ -18,6 +18,8 @@ export interface SessionData {
   /** 現在アクティブな事業所のID */
   companyId?: string;
   oauthState?: string;
+  /** OAuth 完了後に戻す同一オリジン相対パス（例: /expenses/suica?p=...） */
+  oauthReturnTo?: string;
   /** OAuth認可済みの事業所ごとのトークン一覧(1トークン=1事業所のため複数保持する) */
   companies?: FreeeCompanyConnection[];
 }
