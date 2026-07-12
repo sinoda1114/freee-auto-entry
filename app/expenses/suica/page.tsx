@@ -1,5 +1,4 @@
-import { Button } from "@heroui/react";
-import NextLink from "next/link";
+import Link from "next/link";
 import { AuthGate } from "@/app/components/AuthGate";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
@@ -85,15 +84,12 @@ export default async function SuicaExpensePage({
 
   return (
     <PageShell width="md">
-      <Button
-        as={NextLink}
+      <Link
         href="/expenses/new"
-        variant="light"
-        size="sm"
-        className="mb-4 w-fit"
+        className="mb-4 inline-flex w-fit items-center rounded-md px-2 py-1 text-sm text-[var(--freee-text-muted)] hover:bg-[var(--freee-bg)] hover:text-[var(--freee-text)]"
       >
         ← 経費登録に戻る
-      </Button>
+      </Link>
       <PageHeader
         title="Suica交通履歴から経費登録"
         description="Androidアプリでかざして選んだ交通履歴を、旅費交通費として freee に登録します。"
