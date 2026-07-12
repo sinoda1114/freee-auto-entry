@@ -29,7 +29,7 @@ export function ExpensePageView({
       </Button>
       <PageHeader
         title="経費を登録"
-        description="freee 会計へ経費を登録します。"
+        description="領収書をカメラ撮影または選択すると OCR で自動入力し、freee 会計へ登録します。"
       />
       <div className="panel mt-4 px-4 py-4">
         <ExpenseForm accountItems={accountItems} taxCodes={taxCodes} />

@@ -66,7 +66,7 @@ function ToggleActiveButton({
   );
 }
 
-function EditMatcherRow({
+function EditMatcherFields({
   matcher,
   onClose,
 }: {
@@ -86,54 +86,61 @@ function EditMatcherRow({
   }, [onClose, state.status]);
 
   return (
+    <form action={formAction} className="flex flex-wrap items-end gap-2">
+      <input type="hidden" name="matcherId" value={matcher.id} />
+      <Input
+        size="sm"
+        name="description"
+        label="摘要キーワード"
+        labelPlacement="outside"
+        defaultValue={matcher.description}
+        className="min-w-[12rem] max-w-xs"
+        isRequired
+      />
+      <Input
+        size="sm"
+        name="accountItemName"
+        label="勘定科目"
+        labelPlacement="outside"
+        defaultValue={matcher.accountItemName ?? ""}
+        className="min-w-[10rem] max-w-xs"
+        isRequired
+      />
+      <Input
+        size="sm"
+        name="taxName"
+        label="税区分"
+        labelPlacement="outside"
+        defaultValue={matcher.taxName ?? ""}
+        className="min-w-[10rem] max-w-xs"
+        isRequired
+      />
+      <div className="flex items-end gap-2">
+        <Button type="submit" size="sm" color="primary" isLoading={isPending}>
+          保存
+        </Button>
+        <Button size="sm" variant="bordered" onPress={onClose} type="button">
+          キャンセル
+        </Button>
+      </div>
+      {state.status === "error" && state.message ? (
+        <p className="w-full text-xs text-danger">{state.message}</p>
+      ) : null}
+    </form>
+  );
+}
+
+function EditMatcherRow({
+  matcher,
+  onClose,
+}: {
+  matcher: UserMatcher;
+  onClose: () => void;
+}) {
+  return (
     <tr className="bg-default-50">
       <td colSpan={7} className="px-3 py-3">
-        <form action={formAction} className="flex flex-wrap items-end gap-2">
-          <input type="hidden" name="matcherId" value={matcher.id} />
-          <Input
-            size="sm"
-            name="description"
-            label="摘要キーワード"
-            labelPlacement="outside"
-            defaultValue={matcher.description}
-            className="min-w-[12rem] max-w-xs"
-            isRequired
-          />
-          <Input
-            size="sm"
-            name="accountItemName"
-            label="勘定科目"
-            labelPlacement="outside"
-            defaultValue={matcher.accountItemName ?? ""}
-            className="min-w-[10rem] max-w-xs"
-            isRequired
-          />
-          <Input
-            size="sm"
-            name="taxName"
-            label="税区分"
-            labelPlacement="outside"
-            defaultValue={matcher.taxName ?? ""}
-            className="min-w-[10rem] max-w-xs"
-            isRequired
-          />
-          <div className="flex items-end gap-2">
-            <Button
-              type="submit"
-              size="sm"
-              color="primary"
-              isLoading={isPending}
-            >
-              保存
-            </Button>
-            <Button size="sm" variant="bordered" onPress={onClose} type="button">
-              キャンセル
-            </Button>
-          </div>
-          {state.status === "error" && state.message && (
-            <p className="w-full text-xs text-danger">{state.message}</p>
-          )}
-        </form>
+        <EditMatcherFields matcher={matcher} onClose={onClose} />
       </td>
     </tr>
   );
@@ -298,48 +305,23 @@ export function RulesView({ matchers, history = [] }: RulesViewProps) {
             条件に一致するルールはありません。
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="border-b border-[var(--freee-border)] bg-[var(--freee-bg)] text-left text-xs text-[var(--freee-text-muted)]">
-                <tr>
-                  <th className="px-3 py-2 font-semibold">優先度</th>
-                  <th className="px-3 py-2 font-semibold">摘要キーワード</th>
-                  <th className="px-3 py-2 font-semibold">一致</th>
-                  <th className="px-3 py-2 font-semibold">勘定科目 / 税区分</th>
-                  <th className="px-3 py-2 font-semibold">口座</th>
-                  <th className="px-3 py-2 font-semibold">種別</th>
-                  <th className="px-3 py-2 font-semibold">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-default-200">
-                {filtered.map((matcher) => (
-                  <Fragment key={matcher.id}>
-                    <tr
-                      className={`align-top ${!matcher.active ? "opacity-50" : ""}`}
-                    >
-                      <td className="px-3 py-2 font-mono tabular-nums">
-                        {matcher.priority}
-                      </td>
-                      <td className="px-3 py-2">
-                        <p className="font-semibold">{matcher.description}</p>
-                        <p className="text-xs text-[var(--freee-text-muted)]">
-                          {matcherEntrySideLabel(matcher.entrySide)}
-                        </p>
-                      </td>
-                      <td className="px-3 py-2 text-xs">
-                        {matcherConditionLabel(matcher.condition)}
-                      </td>
-                      <td className="px-3 py-2 text-xs">
-                        {matcher.accountItemName ?? "—"}
-                        <span className="text-[var(--freee-text-muted)]">
-                          {" "}
-                          / {matcher.taxName ?? "—"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-xs text-[var(--freee-text-muted)]">
-                        {matcher.walletable ?? "すべて"}
-                      </td>
-                      <td className="px-3 py-2">
+          <>
+            <div className="divide-y divide-default-200 md:hidden">
+              {filtered.map((matcher) => (
+                <article
+                  key={matcher.id}
+                  className={`px-3 py-3 ${!matcher.active ? "opacity-50" : ""}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-[var(--freee-text)]">
+                        {matcher.description}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--freee-text-muted)]">
+                        {matcher.accountItemName ?? "—"} /{" "}
+                        {matcher.taxName ?? "—"}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
                         <Chip
                           size="sm"
                           variant="flat"
@@ -347,37 +329,123 @@ export function RulesView({ matchers, history = [] }: RulesViewProps) {
                         >
                           {matcherActLabel(matcher.act)}
                         </Chip>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-1">
-                          <ToggleActiveButton matcher={matcher} />
-                          {matcher.active && (
-                            <Button
-                              size="sm"
-                              variant="bordered"
-                              onPress={() =>
-                                setEditingId(
-                                  editingId === matcher.id ? null : matcher.id,
-                                )
-                              }
-                            >
-                              {editingId === matcher.id ? "閉じる" : "編集"}
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    {editingId === matcher.id && (
-                      <EditMatcherRow
+                        <Chip size="sm" variant="flat">
+                          {matcherEntrySideLabel(matcher.entrySide)}
+                        </Chip>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-col gap-1">
+                      <ToggleActiveButton matcher={matcher} />
+                      {matcher.active ? (
+                        <Button
+                          size="sm"
+                          variant="bordered"
+                          onPress={() =>
+                            setEditingId(
+                              editingId === matcher.id ? null : matcher.id,
+                            )
+                          }
+                        >
+                          {editingId === matcher.id ? "閉じる" : "編集"}
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                  {editingId === matcher.id ? (
+                    <div className="mt-3 rounded-md bg-[var(--freee-bg)] p-2">
+                      <EditMatcherFields
                         matcher={matcher}
                         onClose={() => setEditingId(null)}
                       />
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="min-w-full text-sm">
+                <thead className="border-b border-[var(--freee-border)] bg-[var(--freee-bg)] text-left text-xs text-[var(--freee-text-muted)]">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">優先度</th>
+                    <th className="px-3 py-2 font-semibold">摘要キーワード</th>
+                    <th className="px-3 py-2 font-semibold">一致</th>
+                    <th className="px-3 py-2 font-semibold">勘定科目 / 税区分</th>
+                    <th className="px-3 py-2 font-semibold">口座</th>
+                    <th className="px-3 py-2 font-semibold">種別</th>
+                    <th className="px-3 py-2 font-semibold">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-default-200">
+                  {filtered.map((matcher) => (
+                    <Fragment key={matcher.id}>
+                      <tr
+                        className={`align-top ${!matcher.active ? "opacity-50" : ""}`}
+                      >
+                        <td className="px-3 py-2 font-mono tabular-nums">
+                          {matcher.priority}
+                        </td>
+                        <td className="px-3 py-2">
+                          <p className="font-semibold">{matcher.description}</p>
+                          <p className="text-xs text-[var(--freee-text-muted)]">
+                            {matcherEntrySideLabel(matcher.entrySide)}
+                          </p>
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {matcherConditionLabel(matcher.condition)}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {matcher.accountItemName ?? "—"}
+                          <span className="text-[var(--freee-text-muted)]">
+                            {" "}
+                            / {matcher.taxName ?? "—"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-xs text-[var(--freee-text-muted)]">
+                          {matcher.walletable ?? "すべて"}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Chip
+                            size="sm"
+                            variant="flat"
+                            color={matcher.act === 1 ? "primary" : "default"}
+                          >
+                            {matcherActLabel(matcher.act)}
+                          </Chip>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-1">
+                            <ToggleActiveButton matcher={matcher} />
+                            {matcher.active && (
+                              <Button
+                                size="sm"
+                                variant="bordered"
+                                onPress={() =>
+                                  setEditingId(
+                                    editingId === matcher.id
+                                      ? null
+                                      : matcher.id,
+                                  )
+                                }
+                              >
+                                {editingId === matcher.id ? "閉じる" : "編集"}
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {editingId === matcher.id && (
+                        <EditMatcherRow
+                          matcher={matcher}
+                          onClose={() => setEditingId(null)}
+                        />
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

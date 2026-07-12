@@ -17,7 +17,7 @@ import {
   freeeWalletTxnStreamUrlFor,
 } from "@/lib/freee/wallet-url";
 import { MatcherRulePanel, MatcherRuleTrigger } from "./MatcherForm";
-import { WalletBatchFilterBar, WalletBatchPanel } from "./WalletBatchPanel";
+import { WalletBatchFilterBar, WalletBatchPanel, WalletBatchStickyBar } from "./WalletBatchPanel";
 import { WalletTxnSubNav } from "./WalletTxnSubNav";
 
 interface WalletTransactionsViewProps {
@@ -183,11 +183,33 @@ export function WalletTransactionsView({
 
       <div className="panel mt-4 overflow-hidden shadow-sm">
         {visibleItems.length === 0 ? (
-          <p className="px-4 py-8 text-center text-xs text-[var(--freee-text-muted)]">
-            {transactions.length === 0
-              ? "このページに未処理明細はありません。"
-              : "この条件に一致する明細はありません。"}
-          </p>
+          <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+            <p className="text-xs text-[var(--freee-text-muted)]">
+              {transactions.length === 0
+                ? "このページに未処理明細はありません。"
+                : "この条件に一致する明細はありません。"}
+            </p>
+            {transactions.length === 0 ? (
+              <Button
+                as="a"
+                href={FREEE_WALLET_TXNS_LIST_URL}
+                target="_blank"
+                rel="noreferrer"
+                size="sm"
+                variant="bordered"
+              >
+                freeeの明細一覧を開く ↗
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="light"
+                onPress={() => setFilter("all")}
+              >
+                フィルタをすべてに戻す
+              </Button>
+            )}
+          </div>
         ) : (
           <div className="divide-y divide-default-200">
             {visibleItems.map((item) => {
@@ -326,6 +348,11 @@ export function WalletTransactionsView({
         open={batchOpen}
         onClose={() => setBatchOpen(false)}
         selectedItems={selectedItems}
+      />
+      <WalletBatchStickyBar
+        selectedCount={selectedIds.size}
+        onClearSelection={() => setSelectedIds(new Set())}
+        onOpenPreview={() => setBatchOpen(true)}
       />
     </PageShell>
   );
