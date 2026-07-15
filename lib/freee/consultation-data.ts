@@ -121,9 +121,13 @@ export async function gatherConsultationContext(
     const amountMatches = relatedWalletTxns.filter(
       (txn) => Math.abs(txn.amount) === Math.abs(transfer.amount),
     );
+<<<<<<< HEAD
     const descriptionHints = relatedWalletTxns.filter((txn) =>
       /ｼﾞﾖｰｽﾞ|ジョーズ|JOE|ガレージ|GARAGE/i.test(txn.description),
     );
+=======
+    const descriptionHints: WalletTransaction[] = [];
+>>>>>>> origin/main
 
     return {
       targetLabel: `口座振替 #${transfer.id}`,

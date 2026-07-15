@@ -1,5 +1,6 @@
 "use client";
 
+<<<<<<< HEAD
 import { Button, Spinner, Textarea } from "@heroui/react";
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
@@ -21,12 +22,23 @@ type ChatMessage =
       investigationId: string | null;
       similar: Array<{ threadId: string; reason: string; subject: string }>;
     };
+=======
+import { useState } from "react";
+import {
+  AiConsultationPanel,
+} from "./AiConsultationPanel";
+import {
+  CONSULTATION_PANEL_CLASS,
+  type ConsultationViewMode,
+} from "@/lib/ai/consultation-ui";
+>>>>>>> origin/main
 
 export function AiConsultationWidget({
   companyId,
 }: {
   companyId: string;
 }) {
+<<<<<<< HEAD
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
@@ -69,10 +81,16 @@ export function AiConsultationWidget({
       }
     });
   }
+=======
+  const [open, setOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ConsultationViewMode>("compact");
+  const panelClass = CONSULTATION_PANEL_CLASS[viewMode];
+>>>>>>> origin/main
 
   return (
     <>
       {open ? (
+<<<<<<< HEAD
         <div className="fixed bottom-20 right-4 z-50 flex w-[min(100vw-2rem,24rem)] flex-col overflow-hidden rounded-xl border border-[var(--freee-border)] bg-[var(--freee-surface)] shadow-2xl">
           <div className="flex items-center justify-between border-b border-[var(--freee-border)] bg-gradient-to-r from-[var(--freee-hero-from)] to-[var(--freee-hero-to)] px-4 py-3 text-white">
             <div>
@@ -207,13 +225,33 @@ export function AiConsultationWidget({
               調べる
             </Button>
           </div>
+=======
+        <div
+          className={`fixed z-50 flex flex-col ${
+            viewMode === "fullscreen"
+              ? panelClass.shell
+              : `bottom-20 right-4 ${panelClass.shell}`
+          }`}
+        >
+          <AiConsultationPanel
+            companyId={companyId}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            onClose={() => setOpen(false)}
+            bodyClassName={panelClass.body}
+          />
+>>>>>>> origin/main
         </div>
       ) : null}
 
       <button
         type="button"
         aria-label="AIに相談する"
+<<<<<<< HEAD
         className="fixed bottom-4 right-4 z-50 flex h-12 min-w-12 items-center justify-center rounded-full bg-gradient-to-r from-[var(--freee-hero-from)] to-[var(--freee-hero-to)] px-4 text-sm font-bold text-white shadow-lg transition hover:opacity-95"
+=======
+        className="fixed bottom-4 right-4 z-50 flex h-12 min-w-12 items-center justify-center rounded-full bg-gradient-to-r from-[var(--freee-hero-from)] to-[var(--freee-hero-to)] px-4 text-sm font-bold text-white shadow-lg transition hover:opacity-95 sm:text-base"
+>>>>>>> origin/main
         onClick={() => setOpen((value) => !value)}
       >
         {open ? "閉じる" : "AIに相談"}

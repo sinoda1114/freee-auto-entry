@@ -6,10 +6,13 @@ import {
   parseConsultationTarget,
 } from "@/lib/ai/consultation-target";
 import { GeminiApiError } from "@/lib/ai/gemini";
+<<<<<<< HEAD
 import { findSimilarSupportThreads } from "@/lib/ai/support-similarity";
 import { recordSupportInvestigation } from "@/lib/db/support-investigations";
 import { listRecentSupportThreads } from "@/lib/db/support-threads";
 import { getDatabase } from "@/lib/db/turso";
+=======
+>>>>>>> origin/main
 import { gatherConsultationContext } from "@/lib/freee/consultation-data";
 import { getValidFreeeAuth } from "@/lib/freee/session-client";
 import { isE2ETestMode } from "@/lib/e2e/fixtures";
@@ -30,10 +33,15 @@ export type AiConsultationState =
   | { status: "idle" }
   | {
       status: "success";
+<<<<<<< HEAD
       investigationId: string | null;
       targetLabel: string | null;
       report: AiConsultationReportPayload;
       similar: Array<{ threadId: string; reason: string; subject: string }>;
+=======
+      targetLabel: string | null;
+      report: AiConsultationReportPayload;
+>>>>>>> origin/main
     }
   | { status: "error"; message: string };
 
@@ -66,6 +74,7 @@ export async function aiConsultationAction(
     parseConsultationTarget(targetHint) ?? parseConsultationTarget(question);
 
   try {
+<<<<<<< HEAD
     const candidates = await listRecentSupportThreads(
       getDatabase(),
       auth.companyId,
@@ -130,6 +139,36 @@ export async function aiConsultationAction(
         targetLabel: formatConsultationTargetLabel(target),
         report,
         similar,
+=======
+    if (isE2ETestMode()) {
+      return {
+        status: "success",
+        targetLabel: formatConsultationTargetLabel(target),
+        report: {
+          summary:
+            "カード明細由来の処理が、支出ではなく口座振替（現金）として登録されている可能性が高いです。",
+          facts: [
+            "振替元がクレジットカード口座です。",
+            "振替先が現金口座です。",
+            "関連明細に店舗名らしい摘要が見えます。",
+          ],
+          hypotheses: [
+            {
+              title: "明細消込時に口座振替を選び、振替先を現金にした",
+              likelihood: "high",
+              reasoning:
+                "カード自動取込明細を支出ではなく振替で処理したときに起きやすいパターンです。",
+            },
+          ],
+          checkpoints: [
+            "現金口座に同額の入金履歴があるか確認してください。",
+            "同日・同額の支出取引が別にないか確認してください。",
+          ],
+          suggestions: [
+            "本来が店舗利用のカード支払いなら、振替を見直して支出登録を検討してください。",
+          ],
+        },
+>>>>>>> origin/main
       };
     }
 
@@ -140,6 +179,7 @@ export async function aiConsultationAction(
       context,
       pagePath: pagePath || undefined,
     });
+<<<<<<< HEAD
     const investigation = await recordSupportInvestigation(getDatabase(), {
       companyId: auth.companyId,
       question,
@@ -155,6 +195,13 @@ export async function aiConsultationAction(
       targetLabel: formatConsultationTargetLabel(target) ?? context.targetLabel,
       report,
       similar,
+=======
+
+    return {
+      status: "success",
+      targetLabel: formatConsultationTargetLabel(target) ?? context.targetLabel,
+      report,
+>>>>>>> origin/main
     };
   } catch (error) {
     if (error instanceof GeminiApiError) {
