@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  AiConsultationPanel,
-} from "./AiConsultationPanel";
+import { AiConsultationPanel } from "./AiConsultationPanel";
 import {
   CONSULTATION_PANEL_CLASS,
   type ConsultationViewMode,

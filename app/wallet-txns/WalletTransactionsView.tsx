@@ -31,6 +31,7 @@ interface WalletTransactionsViewProps {
   accountItems: AccountItem[];
   taxCodes: TaxCode[];
   walletableNames: Record<string, string>;
+  supportCountsByTxnId?: Record<number, number>;
 }
 
 type BatchFilter = "all" | "rule_matched" | "suggested" | "no_suggestion";
@@ -67,6 +68,7 @@ export function WalletTransactionsView({
   accountItems,
   taxCodes,
   walletableNames,
+  supportCountsByTxnId = {},
 }: WalletTransactionsViewProps) {
   const [openMatcherTxnId, setOpenMatcherTxnId] = useState<number | null>(null);
   const [filter, setFilter] = useState<BatchFilter>("all");
@@ -270,6 +272,19 @@ export function WalletTransactionsView({
                     {formatAmount(transaction.amount)}
                   </p>
                   <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                    {(supportCountsByTxnId[transaction.id] ?? 0) > 0 ? (
+                      <Button
+                        as={NextLink}
+                        href={`/support?target=${encodeURIComponent(
+                          `wallet_txn_id=${transaction.id}`,
+                        )}`}
+                        size="sm"
+                        variant="flat"
+                        className="shrink-0 text-xs font-semibold"
+                      >
+                        相談 {supportCountsByTxnId[transaction.id]}件
+                      </Button>
+                    ) : null}
                     {item.category !== "rule_matched" ? (
                       <MatcherRuleTrigger
                         open={openMatcherTxnId === transaction.id}

@@ -3,7 +3,7 @@
 import { Button } from "@heroui/react";
 import NextLink from "next/link";
 
-type Domain = "accounting" | "billing";
+type Domain = "accounting" | "billing" | "support";
 
 type Workflow = {
   href: string;
@@ -55,25 +55,39 @@ const billingWorkflows: Workflow[] = [
   },
 ];
 
+const supportWorkflows: Workflow[] = [
+  {
+    href: "/support",
+    title: "問い合わせ履歴",
+    description: "freee全サービスの問い合わせを蓄積・検索・再調査",
+    domain: "support",
+  },
+];
+
 function WorkflowCard({ item }: { item: Workflow }) {
   const isAccounting = item.domain === "accounting";
+  const isBilling = item.domain === "billing";
   return (
     <NextLink
       href={item.href}
       className={`panel group flex items-center gap-2.5 border-l-[3px] px-3 py-2.5 transition hover:shadow-sm ${
         isAccounting
           ? "border-l-freee-blue hover:border-freee-blue/45"
-          : "border-l-freee-billing hover:border-freee-billing/45"
+          : isBilling
+            ? "border-l-freee-billing hover:border-freee-billing/45"
+            : "border-l-[var(--freee-text-muted)] hover:border-[var(--freee-text)]"
       }`}
     >
       <span
         className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
           isAccounting
             ? "bg-freee-blue-soft text-freee-blue"
-            : "bg-freee-billing-soft text-freee-billing"
+            : isBilling
+              ? "bg-freee-billing-soft text-freee-billing"
+              : "bg-[var(--freee-bg)] text-[var(--freee-text)]"
         }`}
       >
-        {isAccounting ? "経理" : "請求"}
+        {isAccounting ? "経理" : isBilling ? "請求" : "問い合わせ"}
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-[var(--freee-text)]">
@@ -88,7 +102,9 @@ function WorkflowCard({ item }: { item: Workflow }) {
         className={`text-xs text-[var(--freee-text-muted)] transition ${
           isAccounting
             ? "group-hover:text-freee-blue"
-            : "group-hover:text-freee-billing"
+            : isBilling
+              ? "group-hover:text-freee-billing"
+              : "group-hover:text-[var(--freee-text)]"
         }`}
       >
         →
@@ -111,7 +127,11 @@ function WorkflowGroup({
       <div className="flex items-center gap-2">
         <h2
           className={`text-xs font-bold tracking-wide ${
-            domain === "accounting" ? "text-freee-blue" : "text-freee-billing"
+            domain === "accounting"
+              ? "text-freee-blue"
+              : domain === "billing"
+                ? "text-freee-billing"
+                : "text-[var(--freee-text)]"
           }`}
         >
           {title}
@@ -144,6 +164,11 @@ export function HomeDashboard({
       <div className="flex flex-col gap-5">
         <WorkflowGroup title="経理" domain="accounting" items={accounting} />
         <WorkflowGroup title="請求" domain="billing" items={billingWorkflows} />
+        <WorkflowGroup
+          title="問い合わせ"
+          domain="support"
+          items={supportWorkflows}
+        />
       </div>
 
       <section className="panel mt-5 px-3 py-3">

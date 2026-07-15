@@ -6,6 +6,10 @@ import {
   parseConsultationTarget,
 } from "@/lib/ai/consultation-target";
 import { GeminiApiError } from "@/lib/ai/gemini";
+import { findSimilarSupportThreads } from "@/lib/ai/support-similarity";
+import { recordSupportInvestigation } from "@/lib/db/support-investigations";
+import { listRecentSupportThreads } from "@/lib/db/support-threads";
+import { getDatabase } from "@/lib/db/turso";
 import { gatherConsultationContext } from "@/lib/freee/consultation-data";
 import { getValidFreeeAuth } from "@/lib/freee/session-client";
 import { isE2ETestMode } from "@/lib/e2e/fixtures";
@@ -26,8 +30,10 @@ export type AiConsultationState =
   | { status: "idle" }
   | {
       status: "success";
+      investigationId: string | null;
       targetLabel: string | null;
       report: AiConsultationReportPayload;
+      similar: Array<{ threadId: string; reason: string; subject: string }>;
     }
   | { status: "error"; message: string };
 
@@ -60,34 +66,70 @@ export async function aiConsultationAction(
     parseConsultationTarget(targetHint) ?? parseConsultationTarget(question);
 
   try {
+    const candidates = await listRecentSupportThreads(
+      getDatabase(),
+      auth.companyId,
+      30,
+    ).catch(() => []);
+    const similarMatches = isE2ETestMode()
+      ? []
+      : await findSimilarSupportThreads({ query: question, candidates }).catch(
+          () => [],
+        );
+    const threadById = new Map(candidates.map((thread) => [thread.id, thread]));
+    const similar = similarMatches
+      .map((match) => {
+        const thread = threadById.get(match.threadId);
+        if (!thread) {
+          return null;
+        }
+        return {
+          threadId: match.threadId,
+          reason: match.reason,
+          subject: thread.subject,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+
     if (isE2ETestMode()) {
+      const report = {
+        summary:
+          "カード明細由来の処理が、支出ではなく口座振替（現金）として登録されている可能性が高いです。",
+        facts: [
+          "振替元がクレジットカード口座です。",
+          "振替先が現金口座です。",
+          "関連明細に店舗名らしい摘要が見えます。",
+        ],
+        hypotheses: [
+          {
+            title: "明細消込時に口座振替を選び、振替先を現金にした",
+            likelihood: "high" as const,
+            reasoning:
+              "カード自動取込明細を支出ではなく振替で処理したときに起きやすいパターンです。",
+          },
+        ],
+        checkpoints: [
+          "現金口座に同額の入金履歴があるか確認してください。",
+          "同日・同額の支出取引が別にないか確認してください。",
+        ],
+        suggestions: [
+          "本来が店舗利用のカード支払いなら、振替を見直して支出登録を検討してください。",
+        ],
+      };
+      const investigation = await recordSupportInvestigation(getDatabase(), {
+        companyId: auth.companyId,
+        question,
+        report,
+        targetKind: target?.kind ?? null,
+        targetId: target?.id ?? null,
+        pagePath: pagePath || null,
+      }).catch(() => null);
       return {
         status: "success",
+        investigationId: investigation?.id ?? null,
         targetLabel: formatConsultationTargetLabel(target),
-        report: {
-          summary:
-            "カード明細由来の処理が、支出ではなく口座振替（現金）として登録されている可能性が高いです。",
-          facts: [
-            "振替元がクレジットカード口座です。",
-            "振替先が現金口座です。",
-            "関連明細に店舗名らしい摘要が見えます。",
-          ],
-          hypotheses: [
-            {
-              title: "明細消込時に口座振替を選び、振替先を現金にした",
-              likelihood: "high",
-              reasoning:
-                "カード自動取込明細を支出ではなく振替で処理したときに起きやすいパターンです。",
-            },
-          ],
-          checkpoints: [
-            "現金口座に同額の入金履歴があるか確認してください。",
-            "同日・同額の支出取引が別にないか確認してください。",
-          ],
-          suggestions: [
-            "本来が店舗利用のカード支払いなら、振替を見直して支出登録を検討してください。",
-          ],
-        },
+        report,
+        similar,
       };
     }
 
@@ -98,11 +140,21 @@ export async function aiConsultationAction(
       context,
       pagePath: pagePath || undefined,
     });
+    const investigation = await recordSupportInvestigation(getDatabase(), {
+      companyId: auth.companyId,
+      question,
+      report,
+      targetKind: target?.kind ?? null,
+      targetId: target?.id ?? null,
+      pagePath: pagePath || null,
+    }).catch(() => null);
 
     return {
       status: "success",
+      investigationId: investigation?.id ?? null,
       targetLabel: formatConsultationTargetLabel(target) ?? context.targetLabel,
       report,
+      similar,
     };
   } catch (error) {
     if (error instanceof GeminiApiError) {

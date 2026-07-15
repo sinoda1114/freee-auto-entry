@@ -4,7 +4,7 @@ import { NavbarItem } from "@heroui/react";
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 
-export type NavDomain = "accounting" | "billing";
+export type NavDomain = "accounting" | "billing" | "support";
 
 export type NavItem = {
   href: string;
@@ -22,6 +22,10 @@ const billingNav: NavItem[] = [
   { href: "/invoices", label: "請求書", domain: "billing" },
 ];
 
+const supportNav: NavItem[] = [
+  { href: "/support", label: "問い合わせ", domain: "support" },
+];
+
 export function getNavigationItems(canRegisterExpense: boolean): NavItem[] {
   const accounting = canRegisterExpense
     ? [
@@ -29,7 +33,7 @@ export function getNavigationItems(canRegisterExpense: boolean): NavItem[] {
         { href: "/expenses/new", label: "経費", domain: "accounting" as const },
       ]
     : accountingNav;
-  return [...accounting, ...billingNav];
+  return [...accounting, ...billingNav, ...supportNav];
 }
 
 export function isNavItemActive(pathname: string, href: string): boolean {
@@ -38,9 +42,13 @@ export function isNavItemActive(pathname: string, href: string): boolean {
 
 function navLinkClass(active: boolean, domain: NavDomain): string {
   if (active) {
-    return domain === "accounting"
-      ? "bg-freee-blue/10 text-freee-blue"
-      : "bg-freee-billing/10 text-freee-billing";
+    if (domain === "accounting") {
+      return "bg-freee-blue/10 text-freee-blue";
+    }
+    if (domain === "billing") {
+      return "bg-freee-billing/10 text-freee-billing";
+    }
+    return "bg-[var(--freee-bg)] text-[var(--freee-text)]";
   }
   return "text-[var(--freee-text-muted)] hover:bg-[var(--freee-bg)] hover:text-[var(--freee-text)]";
 }
@@ -54,6 +62,7 @@ export function HeaderNav({
   const navigation = getNavigationItems(canRegisterExpense);
   const accountingItems = navigation.filter((i) => i.domain === "accounting");
   const billingItems = navigation.filter((i) => i.domain === "billing");
+  const supportItems = navigation.filter((i) => i.domain === "support");
 
   return (
     <>
@@ -75,6 +84,23 @@ export function HeaderNav({
         <span className="inline-block h-4 w-px bg-[var(--freee-border)]" />
       </NavbarItem>
       {billingItems.map((item) => {
+        const active = isNavItemActive(pathname, item.href);
+        return (
+          <NavbarItem key={item.href} isActive={active}>
+            <NextLink
+              href={item.href}
+              aria-current={active ? "page" : undefined}
+              className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${navLinkClass(active, item.domain)}`}
+            >
+              {item.label}
+            </NextLink>
+          </NavbarItem>
+        );
+      })}
+      <NavbarItem aria-hidden className="px-1">
+        <span className="inline-block h-4 w-px bg-[var(--freee-border)]" />
+      </NavbarItem>
+      {supportItems.map((item) => {
         const active = isNavItemActive(pathname, item.href);
         return (
           <NavbarItem key={item.href} isActive={active}>

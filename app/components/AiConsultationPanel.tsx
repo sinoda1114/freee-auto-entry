@@ -1,96 +1,21 @@
 "use client";
 
 import { Button, Spinner, Textarea } from "@heroui/react";
+import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import {
   aiConsultationAction,
-  type AiConsultationReportPayload,
 } from "@/app/ai-consultation-action";
-import { formatLikelihood } from "@/lib/ai/accounting-consultation";
+import { ConsultationReportView } from "@/app/components/ConsultationReportView";
+import { RelatedSupportThreads } from "@/app/components/RelatedSupportThreads";
 import {
   type ConsultationChatMessage,
   type ConsultationViewMode,
   loadConsultationState,
   saveConsultationState,
 } from "@/lib/ai/consultation-ui";
-
-function ConsultationReportView({
-  targetLabel,
-  report,
-}: {
-  targetLabel: string | null;
-  report: AiConsultationReportPayload;
-}) {
-  return (
-    <div className="space-y-4 text-base text-[var(--freee-text)]">
-      {targetLabel ? (
-        <p className="text-sm font-semibold text-[var(--freee-blue)]">
-          調査対象: {targetLabel}
-        </p>
-      ) : null}
-      <p className="text-base leading-relaxed">{report.summary}</p>
-
-      {report.facts.length > 0 ? (
-        <section>
-          <h3 className="text-sm font-bold">事実</h3>
-          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-[var(--freee-text-muted)]">
-            {report.facts.map((fact) => (
-              <li key={fact}>{fact}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {report.hypotheses.length > 0 ? (
-        <section>
-          <h3 className="text-sm font-bold">仮説</h3>
-          <div className="mt-1.5 space-y-2.5">
-            {report.hypotheses.map((hypothesis) => (
-              <div
-                key={`${hypothesis.title}-${hypothesis.likelihood}`}
-                className="rounded-md border border-[var(--freee-border)] bg-[color-mix(in_srgb,var(--freee-blue)_5%,var(--freee-surface))] px-3 py-2.5"
-              >
-                <p className="text-sm font-semibold">
-                  [{formatLikelihood(hypothesis.likelihood)}] {hypothesis.title}
-                </p>
-                <p className="mt-1 text-sm leading-relaxed text-[var(--freee-text-muted)]">
-                  {hypothesis.reasoning}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {report.checkpoints.length > 0 ? (
-        <section>
-          <h3 className="text-sm font-bold">確認ポイント</h3>
-          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-[var(--freee-text-muted)]">
-            {report.checkpoints.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {report.suggestions.length > 0 ? (
-        <section>
-          <h3 className="text-sm font-bold">修正案</h3>
-          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-[var(--freee-text-muted)]">
-            {report.suggestions.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      <p className="text-xs text-[var(--freee-text-muted)]">
-        ※ freee のデータは変更しません。調査結果のみです。
-      </p>
-    </div>
-  );
-}
+import { stashSupportDraft } from "@/lib/support/draft-handoff";
 
 export function useAiConsultationChat(companyId: string) {
   const pathname = usePathname();
@@ -142,6 +67,8 @@ export function useAiConsultationChat(companyId: string) {
             role: "assistant",
             targetLabel: result.targetLabel,
             report: result.report,
+            investigationId: result.investigationId,
+            similar: result.similar ?? [],
           },
         ]);
         setQuestion("");
@@ -171,6 +98,61 @@ interface AiConsultationPanelProps {
   showOpenInNewTab?: boolean;
   bodyClassName?: string;
   shellClassName?: string;
+}
+
+function AssistantMessage({
+  message,
+}: {
+  message: Extract<ConsultationChatMessage, { role: "assistant" }>;
+}) {
+  const similar = message.similar ?? [];
+  return (
+    <div className="space-y-2">
+      <ConsultationReportView
+        targetLabel={message.targetLabel}
+        report={message.report}
+      />
+      {similar.length > 0 ? (
+        <RelatedSupportThreads
+          title="似ている過去の問い合わせ"
+          items={similar.map((item) => ({
+            id: item.threadId,
+            subject: item.subject,
+            status: "resolved",
+            category: "other",
+            questionSummary: item.reason,
+            createdAt: "",
+            reason: item.reason,
+          }))}
+        />
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <NextLink
+          href="/support"
+          className="text-[11px] font-semibold text-[var(--freee-blue)] underline-offset-2 hover:underline sm:text-xs"
+        >
+          問い合わせ履歴へ
+        </NextLink>
+        {message.investigationId ? (
+          <NextLink
+            href={`/support/new?investigationId=${encodeURIComponent(message.investigationId)}`}
+            onClick={() =>
+              stashSupportDraft(
+                [
+                  `件名: ${message.targetLabel ?? "AI調査からの下書き"}`,
+                  "",
+                  `調査要約: ${message.report.summary}`,
+                ].join("\n"),
+              )
+            }
+            className="text-[11px] font-semibold text-[var(--freee-blue)] underline-offset-2 hover:underline sm:text-xs"
+          >
+            この内容でfreeeへの問い合わせ文を作る
+          </NextLink>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export function AiConsultationPanel({
@@ -275,10 +257,7 @@ export function AiConsultationPanel({
                 {message.content}
               </div>
             ) : (
-              <ConsultationReportView
-                targetLabel={message.targetLabel}
-                report={message.report}
-              />
+              <AssistantMessage message={message} />
             )}
           </div>
         ))}

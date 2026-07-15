@@ -29,6 +29,10 @@ describe("AppHeader", () => {
       "href",
       "/invoices",
     );
+    expect(screen.getByRole("link", { name: "問い合わせ" })).toHaveAttribute(
+      "href",
+      "/support",
+    );
     expect(screen.queryByRole("link", { name: "経費" })).not.toBeInTheDocument();
   });
 
