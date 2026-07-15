@@ -7,7 +7,7 @@ export type ConsultationChatMessage =
       targetLabel: string | null;
       report: AiConsultationReportPayload;
       investigationId?: string | null;
-      similar?: Array<{ threadId: string; reason: string; subject: string }>;
+      similar?: Array<{ threadId: string; reason: string; subject: string }> | null;
     };
 
 export type ConsultationViewMode = "compact" | "expanded" | "fullscreen";

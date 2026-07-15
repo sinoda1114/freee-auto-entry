@@ -68,7 +68,7 @@ export function useAiConsultationChat(companyId: string) {
             targetLabel: result.targetLabel,
             report: result.report,
             investigationId: result.investigationId,
-            similar: result.similar,
+            similar: result.similar ?? [],
           },
         ]);
         setQuestion("");
