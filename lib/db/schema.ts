@@ -66,6 +66,57 @@ const schemaStatements = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_matcher_creation_history_company
     ON matcher_creation_history (company_id, created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS support_threads (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'other',
+    status TEXT NOT NULL DEFAULT 'open',
+    question_summary TEXT NOT NULL DEFAULT '',
+    answer_summary TEXT NOT NULL DEFAULT '',
+    background TEXT NOT NULL DEFAULT '',
+    conclusion TEXT NOT NULL DEFAULT '',
+    raw_email TEXT NOT NULL,
+    source_url TEXT,
+    tags_json TEXT NOT NULL DEFAULT '[]',
+    freee_target_kind TEXT,
+    freee_target_id INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
+  `ALTER TABLE support_threads ADD COLUMN source_url TEXT`,
+  `UPDATE support_threads SET category = 'accounting'
+    WHERE category IN ('expense', 'wallet')`,
+  `CREATE INDEX IF NOT EXISTS idx_support_threads_company
+    ON support_threads (company_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_support_threads_target
+    ON support_threads (company_id, freee_target_kind, freee_target_id)`,
+  `CREATE VIRTUAL TABLE IF NOT EXISTS support_threads_fts USING fts5(
+    thread_id UNINDEXED,
+    company_id UNINDEXED,
+    subject,
+    question_summary,
+    answer_summary,
+    tags_json,
+    raw_email
+  )`,
+  `CREATE TABLE IF NOT EXISTS support_investigations (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL,
+    thread_id TEXT,
+    question TEXT NOT NULL,
+    target_kind TEXT,
+    target_id INTEGER,
+    page_path TEXT,
+    report_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_support_investigations_company
+    ON support_investigations (company_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_support_investigations_thread
+    ON support_investigations (company_id, thread_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_support_investigations_target
+    ON support_investigations (company_id, target_kind, target_id)`,
 ] as const;
 
 let initialized = false;
@@ -79,11 +130,17 @@ export async function ensureDatabaseSchema(db: Database): Promise<void> {
     try {
       await db.execute(statement);
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message.toLowerCase() : "";
       const isIdempotentColumnMigration =
         statement.startsWith("ALTER TABLE") &&
-        error instanceof Error &&
-        error.message.toLowerCase().includes("duplicate column");
-      if (!isIdempotentColumnMigration) {
+        message.includes("duplicate column");
+      const isOptionalFtsFailure =
+        statement.includes("USING fts5") &&
+        (message.includes("fts5") ||
+          message.includes("no such module") ||
+          message.includes("virtual table"));
+      if (!isIdempotentColumnMigration && !isOptionalFtsFailure) {
         throw error;
       }
     }

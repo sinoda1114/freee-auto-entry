@@ -2,6 +2,8 @@ import { AuthGate } from "@/app/components/AuthGate";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
 import { appPageTitle } from "@/lib/app-brand";
+import { countSupportThreadsByTargetIds } from "@/lib/db/support-threads";
+import { getDatabase } from "@/lib/db/turso";
 import {
   getAccountItems,
   getTaxCodes,
@@ -134,6 +136,18 @@ export default async function WalletTransactionsPage({
     );
   }
 
+  let supportCountsByTxnId: Record<number, number> = {};
+  try {
+    supportCountsByTxnId = await countSupportThreadsByTargetIds(
+      getDatabase(),
+      auth.companyId,
+      "wallet_txn",
+      data.transactions.map((transaction) => transaction.id),
+    );
+  } catch {
+    supportCountsByTxnId = {};
+  }
+
   return (
     <WalletTransactionsView
       companyId={auth.companyId}
@@ -146,6 +160,7 @@ export default async function WalletTransactionsPage({
       accountItems={data.accountItems}
       taxCodes={data.taxCodes}
       walletableNames={data.walletableNames}
+      supportCountsByTxnId={supportCountsByTxnId}
     />
   );
 }

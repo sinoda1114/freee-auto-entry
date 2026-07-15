@@ -204,6 +204,48 @@ export async function getWalletTransactions(
   return data.wallet_txns.map(parseWalletTransaction);
 }
 
+export async function getWalletTransactionById(
+  auth: FreeeAuth,
+  id: number,
+): Promise<WalletTransaction> {
+  if (isE2ETestMode()) {
+    const found = e2eWalletTransactions.find((txn) => txn.id === id);
+    if (!found) {
+      throw new Error(`E2E wallet transaction not found: ${id}`);
+    }
+    return found;
+  }
+  const params = new URLSearchParams({ company_id: auth.companyId });
+  const data = await freeeFetch(auth, `/wallet_txns/${id}?${params}`);
+  if (!isRecord(data) || !data.wallet_txn) {
+    throw new Error("freee wallet transaction response is invalid");
+  }
+  return parseWalletTransaction(data.wallet_txn);
+}
+
+export async function getWalletTransactionsByDateRange(
+  auth: FreeeAuth,
+  range: { startDate: string; endDate: string; limit?: number },
+): Promise<WalletTransaction[]> {
+  if (isE2ETestMode()) {
+    return e2eWalletTransactions.filter(
+      (txn) => txn.date >= range.startDate && txn.date <= range.endDate,
+    );
+  }
+  const params = new URLSearchParams({
+    company_id: auth.companyId,
+    start_date: range.startDate,
+    end_date: range.endDate,
+    limit: String(range.limit ?? 100),
+    offset: "0",
+  });
+  const data = await freeeFetch(auth, `/wallet_txns?${params}`);
+  if (!isRecord(data) || !Array.isArray(data.wallet_txns)) {
+    return [];
+  }
+  return data.wallet_txns.map(parseWalletTransaction);
+}
+
 export async function getUserMatchers(
   auth: FreeeAuth,
   pagination: {
