@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">マイ経理 for freee</title>
+  <rect width="64" height="64" rx="14" fill="#ffffff"/>
+  <g transform="translate(-6.4 -6.4) scale(1.2)">
+    <path d="M22 13h16l9 9v23a5 5 0 0 1-5 5H22a5 5 0 0 1-5-5V18a5 5 0 0 1 5-5Z" fill="#ffffff" stroke="#1f2937" stroke-linejoin="round" stroke-width="4"/>
+    <path d="M38 15v7h7Z" fill="#2864f0"/>
+    <path d="M24 28h13M24 35h10" fill="none" stroke="#1f2937" stroke-linecap="round" stroke-width="4"/>
+    <circle cx="43" cy="43" r="12" fill="#2864f0"/>
+    <path d="m37.5 43 3.5 3.5 7-8" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.5"/>
+  </g>
+</svg>
