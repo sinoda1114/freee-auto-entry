@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.0",
-    "@heroui/react": "^2.8.5",
+    "@heroui/react": "^3.2.2",
     "@libsql/client": "0.17.4",
     "ai": "^5.0.0",
     "framer-motion": "^12.23.24",
