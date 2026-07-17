@@ -98,16 +98,18 @@ export const CONSULTATION_PANEL_CLASS: Record<
   { shell: string; body: string }
 > = {
   compact: {
-    shell: "w-[min(100vw-2rem,26rem)] max-h-[calc(100dvh-6rem)]",
-    body: "min-h-0 flex-1 max-h-[min(55vh,26rem)]",
+    shell:
+      "w-[min(100vw-2rem,26rem)] max-h-[calc(100dvh-6rem)] sm:h-[min(48dvh,28rem)] sm:w-[min(100vw-3rem,44rem)]",
+    body: "min-h-0 flex-1",
   },
   expanded: {
-    shell: "w-[min(100vw-2rem,40rem)] max-h-[calc(100dvh-6rem)]",
-    body: "min-h-0 flex-1 max-h-[min(72vh,36rem)]",
+    shell:
+      "w-[min(100vw-2rem,40rem)] max-h-[calc(100dvh-6rem)] sm:h-[min(48dvh,28rem)] sm:w-[min(100vw-3rem,44rem)]",
+    body: "min-h-0 flex-1",
   },
   fullscreen: {
     shell:
-      "left-4 right-4 top-16 bottom-20 w-auto max-w-4xl mx-auto max-h-[calc(100dvh-6rem)] sm:left-8 sm:right-8",
-    body: "min-h-0 flex-1 max-h-[calc(100dvh-16rem)]",
+      "inset-3 bottom-[4.75rem] sm:inset-4 sm:bottom-[5.5rem] w-auto max-w-none",
+    body: "min-h-0 flex-1",
   },
 };

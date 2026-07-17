@@ -40,6 +40,7 @@ export function AiConsultationWidget({
             onClose={() => setOpen(false)}
             autoFocusQuestion
             panelId={panelId}
+            shellClassName="h-full"
             bodyClassName={panelClass.body}
           />
         </div>
@@ -50,7 +51,7 @@ export function AiConsultationWidget({
         aria-label={open ? "AI相談を閉じる" : "AIに相談する"}
         aria-expanded={open}
         aria-controls={panelId}
-        className="fixed bottom-4 right-4 z-50 flex h-12 w-[7.5rem] items-center justify-center rounded-full bg-gradient-to-r from-[var(--freee-hero-from)] to-[var(--freee-hero-to)] text-sm font-bold text-white shadow-lg transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--freee-blue)] focus-visible:ring-offset-2 sm:text-base"
+        className="fixed bottom-4 right-4 z-50 flex h-12 w-[7.5rem] items-center justify-center rounded-full bg-gradient-to-r from-[var(--freee-hero-from)] to-[var(--freee-hero-to)] text-sm font-bold text-white shadow-lg transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--freee-blue)] focus-visible:ring-offset-2 sm:h-14 sm:w-40 sm:text-lg"
         onClick={() => setOpen((value) => !value)}
       >
         {open ? "閉じる" : "AIに相談"}
