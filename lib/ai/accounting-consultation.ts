@@ -1,6 +1,7 @@
 import { generateGeminiJson } from "./gemini";
 import type { ConsultationTarget } from "./consultation-target";
 import type { ConsultationContextBundle } from "@/lib/freee/consultation-data";
+import type { ConsultationResponseMode } from "./consultation-intent";
 
 export type ConsultationLikelihood = "high" | "medium" | "low";
 
@@ -11,6 +12,7 @@ export interface ConsultationHypothesis {
 }
 
 export interface AccountingConsultationReport {
+  mode: ConsultationResponseMode;
   summary: string;
   facts: string[];
   hypotheses: ConsultationHypothesis[];
@@ -19,6 +21,7 @@ export interface AccountingConsultationReport {
 }
 
 interface RawConsultationReport {
+  mode?: unknown;
   summary?: unknown;
   facts?: unknown;
   hypotheses?: unknown;
@@ -35,14 +38,21 @@ interface RawHypothesis {
 const RESPONSE_SCHEMA = {
   type: "object",
   properties: {
+    mode: {
+      type: "string",
+      enum: ["present", "investigate"],
+      description:
+        "present = show numbers; investigate = why-analysis with hypotheses.",
+    },
     summary: {
       type: "string",
-      description: "One paragraph Japanese summary for the accountant.",
+      description: "Japanese summary matching the response mode.",
     },
     facts: {
       type: "array",
       items: { type: "string" },
-      description: "Observed facts only. No speculation.",
+      description:
+        "For present: key account lines as '科目: 金額円'. For investigate: observed facts only.",
     },
     hypotheses: {
       type: "array",
@@ -58,21 +68,21 @@ const RESPONSE_SCHEMA = {
         },
         required: ["title", "likelihood", "reasoning"],
       },
-      description: "Ranked hypotheses explaining why the record looks this way.",
+      description:
+        "Only for investigate mode. Empty array for present mode unless user asked for analysis.",
     },
     checkpoints: {
       type: "array",
       items: { type: "string" },
-      description: "What the user should verify manually in freee.",
+      description: "Only for investigate mode. Empty for present.",
     },
     suggestions: {
       type: "array",
       items: { type: "string" },
-      description:
-        "Possible fixes. Do not claim they were executed. Read-only advice only.",
+      description: "Only for investigate mode. Empty for present. Read-only advice.",
     },
   },
-  required: ["summary", "facts", "hypotheses", "checkpoints", "suggestions"],
+  required: ["mode", "summary", "facts", "hypotheses", "checkpoints", "suggestions"],
 } as const;
 
 const LIKELIHOOD_LABELS: Record<ConsultationLikelihood, string> = {
@@ -103,13 +113,22 @@ function parseStringArray(value: unknown): string[] {
     .filter(Boolean);
 }
 
+function parseMode(
+  value: unknown,
+  fallback: ConsultationResponseMode,
+): ConsultationResponseMode {
+  return value === "present" || value === "investigate" ? value : fallback;
+}
+
 export function validateConsultationReport(
   raw: RawConsultationReport,
+  fallbackMode: ConsultationResponseMode = "investigate",
 ): AccountingConsultationReport | null {
   if (typeof raw.summary !== "string" || !raw.summary.trim()) {
     return null;
   }
 
+  const mode = parseMode(raw.mode, fallbackMode);
   const hypotheses: ConsultationHypothesis[] = [];
   if (Array.isArray(raw.hypotheses)) {
     for (const item of raw.hypotheses) {
@@ -132,13 +151,47 @@ export function validateConsultationReport(
     }
   }
 
+  // present では調査枠を捨てる（モデルが余計に埋めても表示しない）
+  if (mode === "present") {
+    return {
+      mode,
+      summary: raw.summary.trim(),
+      facts: parseStringArray(raw.facts),
+      hypotheses: [],
+      checkpoints: [],
+      suggestions: [],
+    };
+  }
+
   return {
+    mode,
     summary: raw.summary.trim(),
     facts: parseStringArray(raw.facts),
     hypotheses,
     checkpoints: parseStringArray(raw.checkpoints),
     suggestions: parseStringArray(raw.suggestions),
   };
+}
+
+function modeInstructions(mode: ConsultationResponseMode): string[] {
+  if (mode === "present") {
+    return [
+      "RESPONSE MODE: present (display numbers — NOT investigation).",
+      "The user asked to show / view a report. Match that request.",
+      "- summary: 2–4 short Japanese sentences with period and headline totals (売上・販管費・利益など).",
+      "- facts: list major account lines as '科目名: 金額円' (this IS the report body).",
+      "- hypotheses, checkpoints, suggestions: MUST be empty arrays [].",
+      "Do NOT invent anomalies, tax issues, cost-cut advice, or '修正案' unless the user asked for analysis.",
+      "Do NOT use an investigation tone.",
+    ];
+  }
+  return [
+    "RESPONSE MODE: investigate (why-analysis).",
+    "The user wants to understand WHY something looks wrong or unexpected.",
+    "Separate facts from hypotheses clearly.",
+    "Fill checkpoints the user can verify in freee UI, and suggestions as read-only advice.",
+    "If the record is a credit card wallet transaction registered as transfer to cash, explain why that is unusual.",
+  ];
 }
 
 export function buildAccountingConsultationPrompt(input: {
@@ -151,20 +204,39 @@ export function buildAccountingConsultationPrompt(input: {
     ? `Target: ${input.context.targetLabel}`
     : "Target: not specified (general consultation)";
 
+  const reportSection = input.context.reportSummaries.length
+    ? [
+        "Report summaries (trial PL/BS from freee API — you DO have this data):",
+        ...input.context.reportSummaries.map((line) => line),
+      ]
+    : [
+        "Report summaries: not fetched for this question.",
+        "If the user asks about P&L/BS and reports are missing, say the data was not loaded — do NOT claim you lack API permission.",
+      ];
+
   return [
-    "You are a Japanese bookkeeping investigation assistant for freee accounting software.",
-    "The user is trying to understand WHY an existing record looks the way it does.",
-    "Think across related wallet transactions, transfers, and account types — not just the single record.",
-    "Return JSON only.",
-    "Never claim you changed freee data. This is read-only investigation.",
-    "Separate facts from hypotheses clearly.",
-    "If the record is a credit card wallet transaction registered as transfer to cash, explain why that is unusual.",
-    "Prefer practical checkpoints the user can verify in freee UI.",
+    "You are a Japanese bookkeeping assistant for freee accounting software.",
+    "You can investigate specific records (deals, transfers, wallet transactions) AND present trial reports (損益計算書 / 貸借対照表) when provided below.",
+    "You have read access via this app's freee API integration when Report summaries / Ledger sections are present.",
+    "NEVER say you lack permission to view accounting data or cannot look at the P&L when report data is provided.",
+    "If report data is absent, say it was not retrieved for this turn — not that you are forbidden.",
+    "Return JSON only. Set mode to match the instructions below.",
+    "Never claim you changed freee data. This is read-only.",
+    "",
+    ...modeInstructions(input.context.responseMode),
     "",
     `User question: ${input.question}`,
     targetLine,
+    `Intent: ${input.context.intentKind}`,
+    `Required mode field: ${input.context.responseMode}`,
     input.pagePath ? `Current app page: ${input.pagePath}` : "",
     `Investigation window: ${input.context.investigationWindow.startDate} to ${input.context.investigationWindow.endDate}`,
+    input.context.fiscalYearLabel
+      ? `Fiscal year: ${input.context.fiscalYearLabel}`
+      : "Fiscal year: not resolved",
+    input.context.dataFreshness
+      ? `Data freshness: ${input.context.dataFreshness}`
+      : "",
     "",
     "Primary record:",
     input.context.primaryRecord,
@@ -173,6 +245,11 @@ export function buildAccountingConsultationPrompt(input: {
     input.context.relatedRecords.length
       ? input.context.relatedRecords.map((line) => `- ${line}`).join("\n")
       : "- none",
+    "",
+    ...reportSection,
+    "",
+    "Ledger:",
+    input.context.ledgerSummary ?? "not fetched",
     "",
     "Walletables:",
     input.context.walletableDirectory.map((line) => `- ${line}`).join("\n"),
@@ -192,9 +269,19 @@ export async function consultAccountingWithLlm(input: {
     prompt,
     RESPONSE_SCHEMA,
   );
-  const report = validateConsultationReport(raw);
+  const report = validateConsultationReport(raw, input.context.responseMode);
   if (!report) {
     throw new Error("AI相談の回答を整形できませんでした。");
+  }
+  // プロンプトの意図を優先（モデルが mode を誤っても present を守る）
+  if (input.context.responseMode === "present" && report.mode !== "present") {
+    return {
+      ...report,
+      mode: "present",
+      hypotheses: [],
+      checkpoints: [],
+      suggestions: [],
+    };
   }
   return report;
 }

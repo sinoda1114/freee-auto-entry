@@ -22,8 +22,10 @@ export function AiConsultationPageView({
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         showOpenInNewTab={false}
-        shellClassName="w-full"
-        bodyClassName={`${panelClass.body} min-h-[calc(100vh-22rem)]`}
+        showViewModeControls={false}
+        autoFocusQuestion
+        shellClassName="w-full min-h-[calc(100vh-12rem)]"
+        bodyClassName={`${panelClass.body} min-h-[calc(100vh-22rem)] max-h-none`}
       />
     </div>
   );

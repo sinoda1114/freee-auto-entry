@@ -59,6 +59,7 @@ function parseReport(value: string): AccountingConsultationReport {
     throw new Error("Stored investigation report is invalid");
   }
   return {
+    mode: report.mode === "present" ? "present" : "investigate",
     summary: report.summary,
     facts: Array.isArray(report.facts)
       ? report.facts.filter((item): item is string => typeof item === "string")

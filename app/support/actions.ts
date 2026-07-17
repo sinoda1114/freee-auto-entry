@@ -360,6 +360,7 @@ export async function investigateSupportAction(
 
     if (isE2ETestMode()) {
       const report = {
+        mode: "investigate" as const,
         summary: "E2E調査結果です。",
         facts: ["事実1"],
         hypotheses: [

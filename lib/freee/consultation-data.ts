@@ -1,12 +1,32 @@
 import type { FreeeAuth, Walletable } from "./accounting";
 import { getWalletables } from "./accounting";
+import {
+  getCompanyFiscalYears,
+  type FiscalYear,
+} from "./company";
 import { getDealById } from "./deals-read";
+import {
+  formatGeneralLedgersForPrompt,
+  formatTrialReportForPrompt,
+  getGeneralLedgers,
+  getTrialBs,
+  getTrialPl,
+  type TrialReport,
+} from "./reports";
 import { getTransferById, listTransfersByDateRange } from "./transfers";
 import {
   getWalletTransactionById,
   getWalletTransactionsByDateRange,
   type WalletTransaction,
 } from "./wallet";
+import {
+  detectConsultationIntent,
+  resolveFiscalPeriod,
+  shouldFetchReports,
+  type ConsultationIntent,
+  type ConsultationResponseMode,
+  type ResolvedFiscalPeriod,
+} from "@/lib/ai/consultation-intent";
 import type { ConsultationTarget } from "@/lib/ai/consultation-target";
 
 const WALLETABLE_TYPE_LABELS: Record<string, string> = {
@@ -55,6 +75,31 @@ export interface ConsultationContextBundle {
   primaryRecord: string;
   relatedRecords: string[];
   walletableDirectory: string[];
+  fiscalYearLabel: string | null;
+  reportSummaries: string[];
+  ledgerSummary: string | null;
+  dataFreshness: string | null;
+  intentKind: string;
+  responseMode: ConsultationResponseMode;
+}
+
+function emptyExtras(intent: ConsultationIntent): Pick<
+  ConsultationContextBundle,
+  | "fiscalYearLabel"
+  | "reportSummaries"
+  | "ledgerSummary"
+  | "dataFreshness"
+  | "intentKind"
+  | "responseMode"
+> {
+  return {
+    fiscalYearLabel: null,
+    reportSummaries: [],
+    ledgerSummary: null,
+    dataFreshness: null,
+    intentKind: intent.kind,
+    responseMode: intent.responseMode,
+  };
 }
 
 async function gatherAroundDate(
@@ -76,12 +121,117 @@ async function gatherAroundDate(
   };
 }
 
+async function gatherReportContext(
+  auth: FreeeAuth,
+  intent: ConsultationIntent,
+  fiscalYears: FiscalYear[],
+): Promise<{
+  fiscalYearLabel: string | null;
+  reportSummaries: string[];
+  ledgerSummary: string | null;
+  dataFreshness: string | null;
+  period: ResolvedFiscalPeriod | null;
+}> {
+  const period = resolveFiscalPeriod(fiscalYears, intent.fiscalHint);
+  if (!shouldFetchReports(intent) && !period) {
+    return {
+      fiscalYearLabel: null,
+      reportSummaries: [],
+      ledgerSummary: null,
+      dataFreshness: null,
+      period: null,
+    };
+  }
+
+  const fetchPl = intent.wantsPl;
+  const fetchBs = intent.wantsBs;
+  const periodParams = period
+    ? { startDate: period.startDate, endDate: period.endDate }
+    : {};
+
+  const reportSummaries: string[] = [];
+  const freshnessNotes: string[] = [];
+  const notes: string[] = [];
+
+  async function safeTrial(
+    label: string,
+    fetcher: () => Promise<TrialReport>,
+  ): Promise<void> {
+    try {
+      const report = await fetcher();
+      reportSummaries.push(formatTrialReportForPrompt(label, report));
+      if (!report.upToDate) {
+        freshnessNotes.push(
+          `${label}: 集計未完了${
+            report.upToDateReasons.length
+              ? `（${report.upToDateReasons.join("; ")}）`
+              : ""
+          }`,
+        );
+      } else {
+        freshnessNotes.push(`${label}: 集計は最新`);
+      }
+    } catch (error) {
+      notes.push(
+        `${label}: 取得失敗（${
+          error instanceof Error ? error.message : "不明なエラー"
+        }）。権限不足ではなく、取得エラーとして扱うこと。`,
+      );
+    }
+  }
+
+  if (fetchPl) {
+    await safeTrial("損益計算書", () => getTrialPl(auth, periodParams));
+  }
+  if (fetchBs) {
+    await safeTrial("貸借対照表", () => getTrialBs(auth, periodParams));
+  }
+
+  let ledgerSummary: string | null = null;
+  if (intent.wantsLedger || intent.accountItemName) {
+    const startDate =
+      period?.startDate ??
+      shiftDate(new Date().toISOString().slice(0, 10), -365);
+    const endDate =
+      period?.endDate ?? new Date().toISOString().slice(0, 10);
+    try {
+      const ledgers = await getGeneralLedgers(auth, {
+        startDate,
+        endDate,
+        accountItemName: intent.accountItemName ?? undefined,
+      });
+      ledgerSummary = formatGeneralLedgersForPrompt(ledgers);
+    } catch (error) {
+      ledgerSummary = `総勘定元帳: 取得失敗（${
+        error instanceof Error ? error.message : "不明なエラー"
+      }）。プラン制限やβAPIの可能性あり。権限がないと断定しないこと。`;
+    }
+  }
+
+  if (notes.length > 0) {
+    reportSummaries.push(...notes);
+  }
+
+  return {
+    fiscalYearLabel: period?.label ?? null,
+    reportSummaries,
+    ledgerSummary,
+    dataFreshness:
+      freshnessNotes.length > 0 ? freshnessNotes.join(" / ") : null,
+    period,
+  };
+}
+
 export async function gatherConsultationContext(
   auth: FreeeAuth,
   target: ConsultationTarget | null,
   question: string,
 ): Promise<ConsultationContextBundle> {
-  const walletables = await getWalletables(auth);
+  const intent = detectConsultationIntent(question, Boolean(target));
+  const [walletables, fiscalYears] = await Promise.all([
+    getWalletables(auth),
+    getCompanyFiscalYears(auth).catch(() => [] as FiscalYear[]),
+  ]);
   const walletableDirectory = walletables.map(
     (item) => `${item.name} (id=${item.id})`,
   );
@@ -89,16 +239,35 @@ export async function gatherConsultationContext(
     walletables.map((item) => [item.id, item.name]),
   );
 
+  const reportContext = await gatherReportContext(auth, intent, fiscalYears);
+  const extras = {
+    ...emptyExtras(intent),
+    fiscalYearLabel: reportContext.fiscalYearLabel,
+    reportSummaries: reportContext.reportSummaries,
+    ledgerSummary: reportContext.ledgerSummary,
+    dataFreshness: reportContext.dataFreshness,
+  };
+
   if (!target) {
+    const window = reportContext.period
+      ? {
+          startDate: reportContext.period.startDate,
+          endDate: reportContext.period.endDate,
+        }
+      : {
+          startDate: shiftDate(new Date().toISOString().slice(0, 10), -30),
+          endDate: new Date().toISOString().slice(0, 10),
+        };
+
     return {
       targetLabel: null,
-      investigationWindow: {
-        startDate: shiftDate(new Date().toISOString().slice(0, 10), -30),
-        endDate: new Date().toISOString().slice(0, 10),
-      },
-      primaryRecord: `調査対象 ID は未指定です。質問: ${question}`,
+      investigationWindow: window,
+      primaryRecord: reportContext.reportSummaries.length
+        ? `レポート参照モード。質問: ${question}`
+        : `調査対象 ID は未指定です。質問: ${question}`,
       relatedRecords: [],
       walletableDirectory,
+      ...extras,
     };
   }
 
@@ -143,6 +312,7 @@ export async function gatherConsultationContext(
         ...descriptionHints.map((txn) => summarizeWalletTxn(txn, walletableNames)),
       ].slice(0, 20),
       walletableDirectory,
+      ...extras,
     };
   }
 
@@ -177,6 +347,7 @@ export async function gatherConsultationContext(
         ...relatedWalletTxns.map((txn) => summarizeWalletTxn(txn, walletableNames)),
       ].slice(0, 20),
       walletableDirectory,
+      ...extras,
     };
   }
 
@@ -200,5 +371,6 @@ export async function gatherConsultationContext(
         .map((txn) => summarizeWalletTxn(txn, walletableNames)),
     ].slice(0, 20),
     walletableDirectory,
+    ...extras,
   };
 }
