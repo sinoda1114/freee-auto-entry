@@ -15,6 +15,7 @@ import { getValidFreeeAuth } from "@/lib/freee/session-client";
 import { isE2ETestMode } from "@/lib/e2e/fixtures";
 
 export type AiConsultationReportPayload = {
+  mode?: "present" | "investigate";
   summary: string;
   facts: string[];
   hypotheses: Array<{
@@ -93,6 +94,7 @@ export async function aiConsultationAction(
 
     if (isE2ETestMode()) {
       const report = {
+        mode: "investigate" as const,
         summary:
           "カード明細由来の処理が、支出ではなく口座振替（現金）として登録されている可能性が高いです。",
         facts: [

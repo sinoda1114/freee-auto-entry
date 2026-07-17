@@ -19,7 +19,7 @@ export default async function AiConsultationPage() {
     <PageShell>
       <PageHeader
         title="AIに相談する"
-        description="freee の取引・口座振替・明細について、なぜこうなっているかを調べます。freee のデータは変更しません。"
+        description="取引・口座振替・明細に加え、損益計算書や貸借対照表も参照して調べます。freee のデータは変更しません。"
       />
       <AiConsultationPageView companyId={auth.companyId} />
     </PageShell>

@@ -3,19 +3,30 @@
 import { Button, Spinner, Textarea } from "@heroui/react";
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
 import {
-  aiConsultationAction,
-} from "@/app/ai-consultation-action";
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+  type RefObject,
+} from "react";
+import { aiConsultationAction } from "@/app/ai-consultation-action";
 import { ConsultationReportView } from "@/app/components/ConsultationReportView";
 import { RelatedSupportThreads } from "@/app/components/RelatedSupportThreads";
 import {
+  createConsultationMessageId,
   type ConsultationChatMessage,
   type ConsultationViewMode,
+  clearConsultationState,
   loadConsultationState,
   saveConsultationState,
+  VIEW_MODE_LABELS,
 } from "@/lib/ai/consultation-ui";
 import { stashSupportDraft } from "@/lib/support/draft-handoff";
+
+const HEADER_ACTION_CLASS =
+  "rounded-md px-2 py-1 text-xs font-semibold text-white/95 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--freee-blue-dark)] disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm";
 
 export function useAiConsultationChat(companyId: string) {
   const pathname = usePathname();
@@ -50,7 +61,14 @@ export function useAiConsultationChat(companyId: string) {
     }
 
     setError(null);
-    setMessages((prev) => [...prev, { role: "user", content: trimmedQuestion }]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: createConsultationMessageId(),
+        role: "user",
+        content: trimmedQuestion,
+      },
+    ]);
 
     const formData = new FormData();
     formData.set("companyId", companyId);
@@ -64,6 +82,7 @@ export function useAiConsultationChat(companyId: string) {
         setMessages((prev) => [
           ...prev,
           {
+            id: createConsultationMessageId(),
             role: "assistant",
             targetLabel: result.targetLabel,
             report: result.report,
@@ -78,6 +97,17 @@ export function useAiConsultationChat(companyId: string) {
     });
   }
 
+  function clearChat() {
+    if (isPending) {
+      return;
+    }
+    setMessages([]);
+    setQuestion("");
+    setTargetHint("");
+    setError(null);
+    clearConsultationState();
+  }
+
   return {
     question,
     setQuestion,
@@ -87,6 +117,7 @@ export function useAiConsultationChat(companyId: string) {
     error,
     isPending,
     handleSubmit,
+    clearChat,
   };
 }
 
@@ -96,8 +127,11 @@ interface AiConsultationPanelProps {
   onViewModeChange: (mode: ConsultationViewMode) => void;
   onClose?: () => void;
   showOpenInNewTab?: boolean;
+  showViewModeControls?: boolean;
+  autoFocusQuestion?: boolean;
   bodyClassName?: string;
   shellClassName?: string;
+  panelId?: string;
 }
 
 function AssistantMessage({
@@ -126,10 +160,10 @@ function AssistantMessage({
           }))}
         />
       ) : null}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-x-3 gap-y-1.5">
         <NextLink
           href="/support"
-          className="text-[11px] font-semibold text-[var(--freee-blue)] underline-offset-2 hover:underline sm:text-xs"
+          className="text-sm font-semibold text-[var(--freee-blue)] underline-offset-2 hover:underline"
         >
           問い合わせ履歴へ
         </NextLink>
@@ -145,7 +179,7 @@ function AssistantMessage({
                 ].join("\n"),
               )
             }
-            className="text-[11px] font-semibold text-[var(--freee-blue)] underline-offset-2 hover:underline sm:text-xs"
+            className="text-sm font-semibold text-[var(--freee-blue)] underline-offset-2 hover:underline"
           >
             この内容でfreeeへの問い合わせ文を作る
           </NextLink>
@@ -161,8 +195,11 @@ export function AiConsultationPanel({
   onViewModeChange,
   onClose,
   showOpenInNewTab = true,
+  showViewModeControls = true,
+  autoFocusQuestion = false,
   bodyClassName = "",
   shellClassName = "",
+  panelId,
 }: AiConsultationPanelProps) {
   const {
     question,
@@ -173,7 +210,44 @@ export function AiConsultationPanel({
     error,
     isPending,
     handleSubmit,
+    clearChat,
   } = useAiConsultationChat(companyId);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const questionRef = useRef<HTMLTextAreaElement>(null);
+  const generatedId = useId();
+  const resolvedPanelId = panelId ?? `ai-consultation-panel-${generatedId}`;
+
+  const canClear =
+    !isPending &&
+    (messages.length > 0 ||
+      question.trim().length > 0 ||
+      targetHint.trim().length > 0 ||
+      Boolean(error));
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, isPending, error]);
+
+  useEffect(() => {
+    if (!autoFocusQuestion) {
+      return;
+    }
+    questionRef.current?.focus();
+  }, [autoFocusQuestion]);
+
+  useEffect(() => {
+    if (!onClose) {
+      return;
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose?.();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   function openInNewTab() {
     saveConsultationState({ messages, targetHint, viewMode: "expanded" });
@@ -192,36 +266,53 @@ export function AiConsultationPanel({
     onViewModeChange("compact");
   }
 
-  const viewModeLabel =
+  const nextViewModeLabel =
     viewMode === "compact"
-      ? "拡大"
+      ? "拡大にする"
       : viewMode === "expanded"
-        ? "全画面"
-        : "縮小";
+        ? "全画面にする"
+        : "コンパクトにする";
 
   return (
     <div
-      className={`flex flex-col overflow-hidden rounded-xl border border-[var(--freee-border)] bg-[var(--freee-surface)] shadow-2xl ${shellClassName}`}
+      id={resolvedPanelId}
+      role="dialog"
+      aria-label="AIに相談する"
+      aria-modal={onClose ? true : undefined}
+      className={`flex max-h-full flex-col overflow-hidden rounded-xl border border-[var(--freee-border)] bg-[var(--freee-surface)] shadow-2xl ${shellClassName}`}
     >
       <div className="flex items-start justify-between gap-2 border-b border-[var(--freee-border)] bg-gradient-to-r from-[var(--freee-hero-from)] to-[var(--freee-hero-to)] px-4 py-3 text-white">
         <div className="min-w-0">
           <p className="text-base font-bold">AIに相談する</p>
           <p className="text-xs text-white/85 sm:text-sm">
-            経理データの調査モード（読み取り専用）
+            読み取り専用（明細調査・試算表参照）
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
-            className="rounded-md px-2 py-1 text-xs font-semibold text-white/95 hover:bg-white/10 sm:text-sm"
-            onClick={cycleViewMode}
+            className={HEADER_ACTION_CLASS}
+            onClick={clearChat}
+            disabled={!canClear}
+            aria-label="会話をクリア"
           >
-            {viewModeLabel}
+            クリア
           </button>
+          {showViewModeControls ? (
+            <button
+              type="button"
+              className={HEADER_ACTION_CLASS}
+              aria-label={`表示サイズを変更（現在: ${VIEW_MODE_LABELS[viewMode]}）`}
+              title={`現在: ${VIEW_MODE_LABELS[viewMode]}`}
+              onClick={cycleViewMode}
+            >
+              {nextViewModeLabel}
+            </button>
+          ) : null}
           {showOpenInNewTab ? (
             <button
               type="button"
-              className="hidden rounded-md px-2 py-1 text-xs font-semibold text-white/95 hover:bg-white/10 sm:inline sm:text-sm"
+              className={`hidden sm:inline ${HEADER_ACTION_CLASS}`}
               onClick={openInNewTab}
             >
               別画面
@@ -231,7 +322,7 @@ export function AiConsultationPanel({
             <button
               type="button"
               aria-label="閉じる"
-              className="rounded-md px-2 py-1 text-lg leading-none text-white/95 hover:bg-white/10"
+              className={`text-lg leading-none ${HEADER_ACTION_CLASS}`}
               onClick={onClose}
             >
               ×
@@ -240,18 +331,17 @@ export function AiConsultationPanel({
         </div>
       </div>
 
-      <div
-        className={`space-y-4 overflow-y-auto px-4 py-4 ${bodyClassName}`}
-      >
+      <div className={`space-y-4 overflow-y-auto px-4 py-4 ${bodyClassName}`}>
         {messages.length === 0 ? (
-          <p className="text-sm leading-relaxed text-[var(--freee-text-muted)]">
-            freee の取引・口座振替・明細について、なぜこうなっているかを調べます。
-            URL や ID を貼ると調査対象を自動認識します。
+          <p className="text-sm leading-relaxed text-[var(--freee-text-muted)] sm:text-base sm:leading-7">
+            freee の取引・口座振替・明細に加え、損益計算書や貸借対照表も参照して調べます。
+            URL や ID を貼ると調査対象を自動認識します。freee
+            のデータは変更しません。
           </p>
         ) : null}
 
-        {messages.map((message, index) => (
-          <div key={`${message.role}-${index}`}>
+        {messages.map((message) => (
+          <div key={message.id}>
             {message.role === "user" ? (
               <div className="ml-4 rounded-lg bg-[color-mix(in_srgb,var(--freee-blue)_10%,var(--freee-surface))] px-3 py-2.5 text-sm leading-relaxed sm:ml-8 sm:text-base">
                 {message.content}
@@ -274,6 +364,8 @@ export function AiConsultationPanel({
             {error}
           </p>
         ) : null}
+
+        <div ref={bottomRef} />
       </div>
 
       <div className="space-y-2.5 border-t border-[var(--freee-border)] px-4 py-3">
@@ -289,8 +381,9 @@ export function AiConsultationPanel({
           classNames={{ input: "text-sm sm:text-base" }}
         />
         <Textarea
+          ref={questionRef as RefObject<HTMLTextAreaElement>}
           aria-label="相談内容"
-          placeholder="例: なぜこの振替が現金になっている？"
+          placeholder="例: 25年度の損益計算書のポイントは？ / なぜこの振替が現金になっている？"
           value={question}
           onValueChange={setQuestion}
           minRows={2}
@@ -305,6 +398,9 @@ export function AiConsultationPanel({
             }
           }}
         />
+        <p className="text-xs text-[var(--freee-text-muted)]">
+          ⌘/Ctrl + Enter で送信
+        </p>
         <div className="flex flex-wrap gap-2">
           <Button
             color="primary"
