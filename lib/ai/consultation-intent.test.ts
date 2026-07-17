@@ -14,12 +14,16 @@ const fiscalYears: FiscalYear[] = [
     startDate: "2025-01-01",
     endDate: "2025-12-31",
     isClosed: false,
+    taxAccountMethod: 0,
+    taxMethod: 0,
   },
   {
     id: 1,
     startDate: "2024-01-01",
     endDate: "2024-12-31",
     isClosed: true,
+    taxAccountMethod: 0,
+    taxMethod: 0,
   },
 ];
 

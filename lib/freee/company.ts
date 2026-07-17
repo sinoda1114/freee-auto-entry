@@ -13,6 +13,23 @@ export interface FiscalYear {
   startDate: string;
   endDate: string;
   isClosed: boolean;
+  /** 経理方式: 0=税込経理, 1=税抜経理（freee API） */
+  taxAccountMethod: number | null;
+  /** 課税方式コード（freee API の tax_method。詳細ラベルは mapTaxMethodLabel） */
+  taxMethod: number | null;
+}
+
+export function mapTaxAccountMethodLabel(code: number | null): string {
+  if (code === 0) return "税込経理";
+  if (code === 1) return "税抜経理";
+  if (code === null) return "不明";
+  return `不明（コード${code}）`;
+}
+
+/** tax_method は環境により意味が揺れるためコードのみ返す */
+export function mapTaxMethodLabel(code: number | null): string {
+  if (code === null) return "不明";
+  return `コード${code}`;
 }
 
 export interface RegistrableDateRange {
@@ -31,6 +48,8 @@ interface RawFiscalYear {
   start_date: string;
   end_date: string;
   is_closed: boolean;
+  tax_account_method?: unknown;
+  tax_method?: unknown;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -126,6 +145,9 @@ export async function getCompanyFiscalYears(
     startDate: fy.start_date,
     endDate: fy.end_date,
     isClosed: fy.is_closed,
+    taxAccountMethod:
+      typeof fy.tax_account_method === "number" ? fy.tax_account_method : null,
+    taxMethod: typeof fy.tax_method === "number" ? fy.tax_method : null,
   }));
 }
 
