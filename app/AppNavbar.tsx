@@ -46,7 +46,7 @@ export function AppNavbar({
           className="text-sm font-bold tracking-tight text-[var(--freee-text)]"
           aria-label={APP_NAME}
         >
-          <span>スマート経理</span>
+          <span>マイ経理</span>
           <span className="ml-1 font-normal text-[var(--freee-text-muted)]">
             for{" "}
           </span>
