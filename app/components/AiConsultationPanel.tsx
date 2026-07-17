@@ -246,42 +246,32 @@ export function AiConsultationPanel({
   }, [autoFocusQuestion]);
 
   useEffect(() => {
-    if (!onClose) {
-      return;
-    }
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose?.();
+      if (event.key !== "Escape") {
+        return;
       }
+      event.preventDefault();
+      if (viewMode === "fullscreen") {
+        onViewModeChange("compact");
+        return;
+      }
+      onClose?.();
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, onViewModeChange, viewMode]);
 
   function openInNewTab() {
-    saveConsultationState({ messages, targetHint, viewMode: "expanded" });
+    saveConsultationState({ messages, targetHint, viewMode: "compact" });
     window.open("/ai-consultation", "_blank", "noopener,noreferrer");
   }
 
-  function cycleViewMode() {
-    if (viewMode === "compact") {
-      onViewModeChange("expanded");
-      return;
-    }
-    if (viewMode === "expanded") {
-      onViewModeChange("fullscreen");
-      return;
-    }
-    onViewModeChange("compact");
+  function toggleFullscreen() {
+    onViewModeChange(viewMode === "fullscreen" ? "compact" : "fullscreen");
   }
 
-  const nextViewModeLabel =
-    viewMode === "compact"
-      ? "拡大"
-      : viewMode === "expanded"
-        ? "全画面"
-        : "コンパクト";
+  const isFullscreen = viewMode === "fullscreen";
+  const fullscreenToggleLabel = isFullscreen ? "戻す" : "全画面";
 
   return (
     <div
@@ -289,11 +279,11 @@ export function AiConsultationPanel({
       role="dialog"
       aria-label="AIに相談する"
       aria-modal={onClose ? true : undefined}
-      className={`flex max-h-full flex-col overflow-hidden rounded-xl border border-[var(--freee-border)] bg-[var(--freee-surface)] shadow-2xl ${shellClassName}`}
+      className={`flex h-full max-h-full flex-col overflow-hidden rounded-xl border border-[var(--freee-border)] bg-[var(--freee-surface)] shadow-2xl ${shellClassName}`}
     >
-      <div className="flex items-start justify-between gap-2 border-b border-[var(--freee-border)] bg-gradient-to-r from-[var(--freee-hero-from)] to-[var(--freee-hero-to)] px-4 py-3 text-white">
+      <div className="flex items-center justify-between gap-2 border-b border-[var(--freee-border)] bg-gradient-to-r from-[var(--freee-hero-from)] to-[var(--freee-hero-to)] px-4 py-2 text-white">
         <div className="min-w-0">
-          <p className="text-base font-bold">AIに相談する</p>
+          <p className="text-sm font-bold sm:text-base">AIに相談する</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -309,11 +299,15 @@ export function AiConsultationPanel({
             <button
               type="button"
               className={HEADER_ACTION_CLASS}
-              aria-label={`表示サイズを変更（現在: ${VIEW_MODE_LABELS[viewMode]}）`}
-              title={`現在: ${VIEW_MODE_LABELS[viewMode]}`}
-              onClick={cycleViewMode}
+              aria-label={
+                isFullscreen
+                  ? "コンパクト表示に戻す"
+                  : `全画面にする（現在: ${VIEW_MODE_LABELS[viewMode]}）`
+              }
+              title={fullscreenToggleLabel}
+              onClick={toggleFullscreen}
             >
-              {nextViewModeLabel}
+              {fullscreenToggleLabel}
             </button>
           ) : null}
           {showOpenInNewTab ? (
@@ -338,15 +332,13 @@ export function AiConsultationPanel({
         </div>
       </div>
 
-      <div className={`space-y-4 overflow-y-auto px-4 py-4 ${bodyClassName}`}>
-        {messages.length === 0 ? (
-          <p className="text-sm leading-relaxed text-[var(--freee-text-muted)] sm:text-base sm:leading-7">
-            freee の取引・口座振替・明細に加え、損益計算書や貸借対照表も参照して調べます。
-            URL や ID を貼ると調査対象を自動認識します。freee
-            のデータは変更しません。
-          </p>
-        ) : null}
-
+      <div
+        className={
+          messages.length === 0 && !isPending && !error
+            ? "max-h-0 min-h-0 overflow-hidden p-0"
+            : `space-y-4 overflow-y-auto px-4 py-4 ${bodyClassName}`
+        }
+      >
         {messages.map((message) => (
           <div key={message.id}>
             {message.role === "user" ? (
@@ -375,7 +367,11 @@ export function AiConsultationPanel({
         <div ref={bottomRef} />
       </div>
 
-      <div className="space-y-2.5 border-t border-[var(--freee-border)] px-4 py-3">
+      <div
+        className={`flex min-h-0 flex-col space-y-2.5 border-t border-[var(--freee-border)] px-4 py-3 ${
+          messages.length === 0 && !isPending && !error ? "flex-1" : "shrink-0"
+        }`}
+      >
         <Textarea
           aria-label="調査対象のヒント"
           placeholder="freee URL や ID（任意）"
@@ -393,11 +389,21 @@ export function AiConsultationPanel({
           placeholder="例: 25年度の損益計算書のポイントは？ / なぜこの振替が現金になっている？"
           value={question}
           onValueChange={setQuestion}
-          minRows={2}
-          maxRows={5}
+          minRows={messages.length === 0 ? 5 : 3}
+          maxRows={messages.length === 0 ? 12 : 8}
           size="md"
           variant="bordered"
-          classNames={{ input: "text-sm sm:text-base" }}
+          classNames={{
+            base:
+              messages.length === 0 && !isPending && !error
+                ? "flex min-h-0 flex-1 flex-col"
+                : undefined,
+            inputWrapper:
+              messages.length === 0 && !isPending && !error
+                ? "flex-1 items-start"
+                : undefined,
+            input: "text-sm sm:text-base",
+          }}
           onKeyDown={(event) => {
             // 日本語IMEの変換確定 Enter では送信しない
             if (event.nativeEvent.isComposing || event.keyCode === 229) {
