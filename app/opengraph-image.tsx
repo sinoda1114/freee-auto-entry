@@ -10,8 +10,15 @@ const navy = "#1f2937";
 const blue = "#2864f0";
 
 export default async function OpenGraphImage() {
-  const icon = await readFile(new URL("./favicon.svg", import.meta.url));
-  const iconSrc = `data:image/svg+xml;base64,${icon.toString("base64")}`;
+  let icon: Buffer;
+  try {
+    icon = await readFile(new URL("./favicon.svg", import.meta.url));
+  } catch (error) {
+    console.error("Failed to load favicon:", error);
+    // Fallback to a simple inline SVG or return early with a basic image
+    throw new Error("Failed to load favicon for OpenGraph image");
+  }
+  const iconSrc = `
 
   return new ImageResponse(
     (
