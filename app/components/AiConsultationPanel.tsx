@@ -70,11 +70,21 @@ export function useAiConsultationChat(companyId: string) {
       },
     ]);
 
+    const historyPayload = messages.map((message) =>
+      message.role === "user"
+        ? { role: "user" as const, content: message.content }
+        : {
+            role: "assistant" as const,
+            content: message.report.summary,
+          },
+    );
+
     const formData = new FormData();
     formData.set("companyId", companyId);
     formData.set("question", trimmedQuestion);
     formData.set("targetHint", targetHint.trim());
     formData.set("pagePath", pathname);
+    formData.set("history", JSON.stringify(historyPayload));
 
     startTransition(async () => {
       const result = await aiConsultationAction({ status: "idle" }, formData);
@@ -268,10 +278,10 @@ export function AiConsultationPanel({
 
   const nextViewModeLabel =
     viewMode === "compact"
-      ? "拡大にする"
+      ? "拡大"
       : viewMode === "expanded"
-        ? "全画面にする"
-        : "コンパクトにする";
+        ? "全画面"
+        : "コンパクト";
 
   return (
     <div
@@ -284,9 +294,6 @@ export function AiConsultationPanel({
       <div className="flex items-start justify-between gap-2 border-b border-[var(--freee-border)] bg-gradient-to-r from-[var(--freee-hero-from)] to-[var(--freee-hero-to)] px-4 py-3 text-white">
         <div className="min-w-0">
           <p className="text-base font-bold">AIに相談する</p>
-          <p className="text-xs text-white/85 sm:text-sm">
-            読み取り専用（明細調査・試算表参照）
-          </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -392,27 +399,18 @@ export function AiConsultationPanel({
           variant="bordered"
           classNames={{ input: "text-sm sm:text-base" }}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+            // 日本語IMEの変換確定 Enter では送信しない
+            if (event.nativeEvent.isComposing || event.keyCode === 229) {
+              return;
+            }
+            if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
               handleSubmit();
             }
           }}
         />
-        <p className="text-xs text-[var(--freee-text-muted)]">
-          ⌘/Ctrl + Enter で送信
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            color="primary"
-            size="md"
-            className="min-w-[8rem] flex-1 font-semibold"
-            isLoading={isPending}
-            onPress={handleSubmit}
-            isDisabled={!question.trim()}
-          >
-            調べる
-          </Button>
-          {showOpenInNewTab ? (
+        {showOpenInNewTab ? (
+          <div className="flex flex-wrap gap-2">
             <Button
               size="md"
               variant="bordered"
@@ -421,8 +419,8 @@ export function AiConsultationPanel({
             >
               別画面
             </Button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

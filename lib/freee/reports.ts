@@ -34,6 +34,11 @@ export interface TrialPeriodParams {
   fiscalYear?: number;
   startDate?: string;
   endDate?: string;
+  /**
+   * account_item: 勘定科目ごと（消費税推計向け）
+   * group: 決算書表示の大枠（要約表示向け）
+   */
+  accountItemDisplayType?: "account_item" | "group";
 }
 
 export interface SummarizedTrialBalances {
@@ -216,7 +221,10 @@ export async function getTrialPl(
   }
   const query = buildPeriodQuery(params);
   query.set("company_id", auth.companyId);
-  query.set("account_item_display_type", "group");
+  query.set(
+    "account_item_display_type",
+    params.accountItemDisplayType ?? "account_item",
+  );
   const data = await freeeFetch(auth, `/reports/trial_pl?${query.toString()}`);
   return parseTrialReport("pl", "trial_pl", data);
 }
@@ -230,7 +238,10 @@ export async function getTrialBs(
   }
   const query = buildPeriodQuery(params);
   query.set("company_id", auth.companyId);
-  query.set("account_item_display_type", "group");
+  query.set(
+    "account_item_display_type",
+    params.accountItemDisplayType ?? "account_item",
+  );
   const data = await freeeFetch(auth, `/reports/trial_bs?${query.toString()}`);
   return parseTrialReport("bs", "trial_bs", data);
 }
@@ -291,16 +302,19 @@ export async function getGeneralLedgers(
     .filter((line): line is GeneralLedgerLine => line !== null);
 }
 
-/** LLM 向けに試算表行を圧縮する（ゼロ行除去・上位N・浅い階層優先） */
+/** LLM 向けに試算表行を圧縮する（ゼロ行除去・上位N） */
 export function summarizeTrialBalances(
   balances: TrialBalanceLine[],
   limit = 40,
+  options?: { preferShallow?: boolean },
 ): SummarizedTrialBalances {
+  const preferShallow = options?.preferShallow ?? false;
   const nonZero = balances.filter((line) => line.closingBalance !== 0);
   const shallow = nonZero.filter(
     (line) => line.hierarchyLevel === null || line.hierarchyLevel <= 2,
   );
-  const pool = shallow.length > 0 ? shallow : nonZero;
+  const pool =
+    preferShallow && shallow.length > 0 ? shallow : nonZero;
   const ranked = [...pool].sort(
     (a, b) => Math.abs(b.closingBalance) - Math.abs(a.closingBalance),
   );

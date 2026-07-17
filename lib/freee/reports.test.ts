@@ -39,7 +39,30 @@ describe("summarizeTrialBalances", () => {
     const summary = summarizeTrialBalances(balances, 10);
     expect(summary.lines.some((line) => line.includes("売上高"))).toBe(true);
     expect(summary.lines.some((line) => line.includes("ゼロ"))).toBe(false);
-    // hierarchy > 2 は浅い行がある場合は除外される
+    // preferShallow 既定 false なので階層3も残る
+    expect(summary.lines.some((line) => line.includes("小科目"))).toBe(true);
+  });
+
+  it("can prefer shallow rows only", () => {
+    const balances: TrialBalanceLine[] = [
+      {
+        accountItemName: "売上高",
+        hierarchyLevel: 1,
+        parentAccountCategoryName: null,
+        closingBalance: 1000,
+        compositionRatio: 100,
+      },
+      {
+        accountItemName: "小科目",
+        hierarchyLevel: 3,
+        parentAccountCategoryName: "売上高",
+        closingBalance: 50,
+        compositionRatio: 5,
+      },
+    ];
+    const summary = summarizeTrialBalances(balances, 10, {
+      preferShallow: true,
+    });
     expect(summary.lines.some((line) => line.includes("小科目"))).toBe(false);
   });
 });
@@ -49,7 +72,7 @@ describe("getTrialPl / getTrialBs", () => {
     vi.unstubAllGlobals();
   });
 
-  it("fetches trial_pl with group display and date range", async () => {
+  it("fetches trial_pl with account_item display and date range", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -80,7 +103,7 @@ describe("getTrialPl / getTrialBs", () => {
     const [url] = fetchMock.mock.calls[0];
     expect(url).toContain("/reports/trial_pl?");
     expect(url).toContain("company_id=11122591");
-    expect(url).toContain("account_item_display_type=group");
+    expect(url).toContain("account_item_display_type=account_item");
     expect(url).toContain("start_date=2025-01-01");
     expect(url).toContain("end_date=2025-12-31");
     expect(report.kind).toBe("pl");

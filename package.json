@@ -16,14 +16,19 @@
     "postinstall": "node scripts/link-typescript6-for-eslint.mjs"
   },
   "dependencies": {
+    "@ai-sdk/google": "^2.0.0",
     "@heroui/react": "^2.8.5",
     "@libsql/client": "0.17.4",
+    "ai": "^5.0.0",
     "framer-motion": "^12.23.24",
     "iron-session": "8.0.4",
     "next": "16.3.0-canary.83",
     "next-themes": "^0.4.6",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "zod": "^4.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.51.1",

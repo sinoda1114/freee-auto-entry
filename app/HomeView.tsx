@@ -78,17 +78,6 @@ function WorkflowCard({ item }: { item: Workflow }) {
             : "border-l-[var(--freee-text-muted)] hover:border-[var(--freee-text)]"
       }`}
     >
-      <span
-        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-          isAccounting
-            ? "bg-freee-blue-soft text-freee-blue"
-            : isBilling
-              ? "bg-freee-billing-soft text-freee-billing"
-              : "bg-[var(--freee-bg)] text-[var(--freee-text)]"
-        }`}
-      >
-        {isAccounting ? "経理" : isBilling ? "請求" : "問い合わせ"}
-      </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-[var(--freee-text)]">
           {item.title}

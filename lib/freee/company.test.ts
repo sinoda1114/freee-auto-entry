@@ -107,8 +107,40 @@ describe("getCompanyFiscalYears", () => {
         startDate: "2025-06-01",
         endDate: "2026-05-31",
         isClosed: false,
+        taxAccountMethod: null,
+        taxMethod: null,
       },
     ]);
+  });
+
+  it("maps tax accounting method from fiscal years", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          company: {
+            id: 1,
+            fiscal_years: [
+              {
+                id: 10,
+                start_date: "2024-06-01",
+                end_date: "2025-05-31",
+                is_closed: true,
+                tax_account_method: 0,
+                tax_method: 2,
+              },
+            ],
+          },
+        }),
+      }),
+    );
+    const years = await getCompanyFiscalYears({
+      accessToken: "t",
+      companyId: "1",
+    });
+    expect(years[0]?.taxAccountMethod).toBe(0);
+    expect(years[0]?.taxMethod).toBe(2);
   });
 });
 
@@ -121,12 +153,16 @@ describe("resolveRegistrableDateRange", () => {
           startDate: "2024-06-01",
           endDate: "2025-05-31",
           isClosed: true,
+          taxAccountMethod: null,
+          taxMethod: null,
         },
         {
           id: 2,
           startDate: "2025-06-01",
           endDate: "2026-05-31",
           isClosed: false,
+          taxAccountMethod: null,
+          taxMethod: null,
         },
       ],
       "2025-12-01",
@@ -145,6 +181,8 @@ describe("resolveRegistrableDateRange", () => {
           startDate: "2025-06-01",
           endDate: "2026-05-31",
           isClosed: false,
+          taxAccountMethod: null,
+          taxMethod: null,
         },
       ],
       "2026-07-12",

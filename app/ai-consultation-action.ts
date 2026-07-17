@@ -1,6 +1,9 @@
 "use server";
 
-import { consultAccountingWithLlm } from "@/lib/ai/accounting-consultation";
+import {
+  parseConsultationHistoryJson,
+  runConsultationAgent,
+} from "@/lib/ai/consultation-agent";
 import {
   formatConsultationTargetLabel,
   parseConsultationTarget,
@@ -10,7 +13,6 @@ import { findSimilarSupportThreads } from "@/lib/ai/support-similarity";
 import { recordSupportInvestigation } from "@/lib/db/support-investigations";
 import { listRecentSupportThreads } from "@/lib/db/support-threads";
 import { getDatabase } from "@/lib/db/turso";
-import { gatherConsultationContext } from "@/lib/freee/consultation-data";
 import { getValidFreeeAuth } from "@/lib/freee/session-client";
 import { isE2ETestMode } from "@/lib/e2e/fixtures";
 
@@ -58,6 +60,9 @@ export async function aiConsultationAction(
   const question = String(formData.get("question") ?? "").trim();
   const targetHint = String(formData.get("targetHint") ?? "").trim();
   const pagePath = String(formData.get("pagePath") ?? "").trim();
+  const history = parseConsultationHistoryJson(
+    String(formData.get("history") ?? ""),
+  );
 
   if (!question) {
     return { status: "error", message: "相談内容を入力してください。" };
@@ -92,56 +97,14 @@ export async function aiConsultationAction(
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
 
-    if (isE2ETestMode()) {
-      const report = {
-        mode: "investigate" as const,
-        summary:
-          "カード明細由来の処理が、支出ではなく口座振替（現金）として登録されている可能性が高いです。",
-        facts: [
-          "振替元がクレジットカード口座です。",
-          "振替先が現金口座です。",
-          "関連明細に店舗名らしい摘要が見えます。",
-        ],
-        hypotheses: [
-          {
-            title: "明細消込時に口座振替を選び、振替先を現金にした",
-            likelihood: "high" as const,
-            reasoning:
-              "カード自動取込明細を支出ではなく振替で処理したときに起きやすいパターンです。",
-          },
-        ],
-        checkpoints: [
-          "現金口座に同額の入金履歴があるか確認してください。",
-          "同日・同額の支出取引が別にないか確認してください。",
-        ],
-        suggestions: [
-          "本来が店舗利用のカード支払いなら、振替を見直して支出登録を検討してください。",
-        ],
-      };
-      const investigation = await recordSupportInvestigation(getDatabase(), {
-        companyId: auth.companyId,
-        question,
-        report,
-        targetKind: target?.kind ?? null,
-        targetId: target?.id ?? null,
-        pagePath: pagePath || null,
-      }).catch(() => null);
-      return {
-        status: "success",
-        investigationId: investigation?.id ?? null,
-        targetLabel: formatConsultationTargetLabel(target),
-        report,
-        similar,
-      };
-    }
-
-    const context = await gatherConsultationContext(auth, target, question);
-    const report = await consultAccountingWithLlm({
+    const report = await runConsultationAgent({
+      auth,
       question,
-      target,
-      context,
+      targetHint,
       pagePath: pagePath || undefined,
+      history,
     });
+
     const investigation = await recordSupportInvestigation(getDatabase(), {
       companyId: auth.companyId,
       question,
@@ -154,7 +117,7 @@ export async function aiConsultationAction(
     return {
       status: "success",
       investigationId: investigation?.id ?? null,
-      targetLabel: formatConsultationTargetLabel(target) ?? context.targetLabel,
+      targetLabel: formatConsultationTargetLabel(target),
       report,
       similar,
     };
