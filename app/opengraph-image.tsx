@@ -18,7 +18,7 @@ export default async function OpenGraphImage() {
     // Fallback to a simple inline SVG or return early with a basic image
     throw new Error("Failed to load favicon for OpenGraph image");
   }
-  const iconSrc = `
+  const iconSrc = `data:image/svg+xml;base64,${icon.toString("base64")}`;
 
   return new ImageResponse(
     (
