@@ -23,6 +23,7 @@ export interface SupportThread {
   conclusion: string;
   rawEmail: string;
   sourceUrl: string | null;
+  gmailThreadId: string | null;
   tags: string[];
   freeeTargetKind: ConsultationTargetKind | null;
   freeeTargetId: number | null;
@@ -41,6 +42,7 @@ export type CreateSupportThreadInput = {
   conclusion: string;
   rawEmail: string;
   sourceUrl?: string | null;
+  gmailThreadId?: string | null;
   tags: string[];
   freeeTargetKind?: ConsultationTargetKind | null;
   freeeTargetId?: number | null;
@@ -139,6 +141,7 @@ function parseThread(row: SqlRow): SupportThread {
     conclusion: readString(row, "conclusion"),
     rawEmail: readString(row, "raw_email"),
     sourceUrl: readOptionalString(row, "source_url"),
+    gmailThreadId: readOptionalString(row, "gmail_thread_id"),
     tags: parseTags(readString(row, "tags_json")),
     freeeTargetKind,
     freeeTargetId: readOptionalNumber(row, "freee_target_id"),
@@ -188,11 +191,43 @@ async function upsertFts(
   }
 }
 
+export async function findSupportThreadByGmailThreadId(
+  db: Database,
+  companyId: string,
+  gmailThreadId: string,
+): Promise<SupportThread | null> {
+  await ensureDatabaseSchema(db);
+  const trimmed = gmailThreadId.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const result = await db.execute(
+    `SELECT * FROM support_threads
+      WHERE company_id = :companyId AND gmail_thread_id = :gmailThreadId
+      LIMIT 1`,
+    { companyId, gmailThreadId: trimmed },
+  );
+  const row = result.rows[0];
+  return row ? parseThread(row) : null;
+}
+
 export async function createSupportThread(
   db: Database,
   input: CreateSupportThreadInput,
 ): Promise<SupportThread> {
   await ensureDatabaseSchema(db);
+  const gmailThreadId = input.gmailThreadId?.trim() || null;
+  if (gmailThreadId) {
+    const existing = await findSupportThreadByGmailThreadId(
+      db,
+      input.companyId,
+      gmailThreadId,
+    );
+    if (existing) {
+      return existing;
+    }
+  }
+
   const now = new Date().toISOString();
   const thread: SupportThread = {
     id: randomUUID(),
@@ -206,6 +241,7 @@ export async function createSupportThread(
     conclusion: input.conclusion.trim(),
     rawEmail: input.rawEmail,
     sourceUrl: input.sourceUrl ?? null,
+    gmailThreadId,
     tags: input.tags.map((tag) => tag.trim()).filter(Boolean),
     freeeTargetKind: input.freeeTargetKind ?? null,
     freeeTargetId: input.freeeTargetId ?? null,
@@ -217,12 +253,14 @@ export async function createSupportThread(
     `INSERT INTO support_threads (
       id, company_id, subject, category, status,
       question_summary, answer_summary, background, conclusion,
-      raw_email, source_url, tags_json, freee_target_kind, freee_target_id,
+      raw_email, source_url, gmail_thread_id, tags_json,
+      freee_target_kind, freee_target_id,
       created_at, updated_at
     ) VALUES (
       :id, :companyId, :subject, :category, :status,
       :questionSummary, :answerSummary, :background, :conclusion,
-      :rawEmail, :sourceUrl, :tagsJson, :freeeTargetKind, :freeeTargetId,
+      :rawEmail, :sourceUrl, :gmailThreadId, :tagsJson,
+      :freeeTargetKind, :freeeTargetId,
       :createdAt, :updatedAt
     )`,
     {
@@ -237,6 +275,7 @@ export async function createSupportThread(
       conclusion: thread.conclusion,
       rawEmail: thread.rawEmail,
       sourceUrl: thread.sourceUrl,
+      gmailThreadId: thread.gmailThreadId,
       tagsJson: JSON.stringify(thread.tags),
       freeeTargetKind: thread.freeeTargetKind,
       freeeTargetId: thread.freeeTargetId,

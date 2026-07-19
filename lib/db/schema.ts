@@ -85,12 +85,16 @@ const schemaStatements = [
     updated_at TEXT NOT NULL
   )`,
   `ALTER TABLE support_threads ADD COLUMN source_url TEXT`,
+  `ALTER TABLE support_threads ADD COLUMN gmail_thread_id TEXT`,
   `UPDATE support_threads SET category = 'accounting'
     WHERE category IN ('expense', 'wallet')`,
   `CREATE INDEX IF NOT EXISTS idx_support_threads_company
     ON support_threads (company_id, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_support_threads_target
     ON support_threads (company_id, freee_target_kind, freee_target_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_support_threads_gmail_thread
+    ON support_threads (company_id, gmail_thread_id)
+    WHERE gmail_thread_id IS NOT NULL`,
   `CREATE VIRTUAL TABLE IF NOT EXISTS support_threads_fts USING fts5(
     thread_id UNINDEXED,
     company_id UNINDEXED,
