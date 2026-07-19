@@ -79,6 +79,7 @@ describe("support-similarity", () => {
         conclusion: "",
         rawEmail: "raw",
         sourceUrl: null,
+        gmailThreadId: null,
         tags: ["振替"],
         freeeTargetKind: null,
         freeeTargetId: null,

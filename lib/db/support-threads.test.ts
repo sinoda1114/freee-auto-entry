@@ -70,6 +70,60 @@ describe("support-threads", () => {
     );
   });
 
+  it("skips insert when gmail_thread_id already exists", async () => {
+    const existingRow: SqlRow = {
+      id: "existing-id",
+      company_id: "1",
+      subject: "既存",
+      category: "accounting",
+      status: "resolved",
+      question_summary: "既存質問",
+      answer_summary: "既存回答",
+      background: "",
+      conclusion: "",
+      raw_email: "既存本文",
+      source_url: null,
+      gmail_thread_id: "thread-abc",
+      tags_json: "[]",
+      freee_target_kind: null,
+      freee_target_id: null,
+      created_at: "2026-07-15T00:00:00.000Z",
+      updated_at: "2026-07-15T00:00:00.000Z",
+    };
+    const execute = vi.fn(async (sql: string) => {
+      if (sql.includes("CREATE ") || sql.includes("ALTER ") || sql.includes("USING fts5")) {
+        return { rows: [], rowsAffected: 0 };
+      }
+      if (sql.includes("gmail_thread_id = :gmailThreadId")) {
+        return { rows: [existingRow], rowsAffected: 1 };
+      }
+      throw new Error(`unexpected sql: ${sql}`);
+    });
+    const db: Database = { execute };
+
+    const thread = await createSupportThread(db, {
+      companyId: "1",
+      subject: "新しい件名",
+      category: "other",
+      status: "open",
+      questionSummary: "新規",
+      answerSummary: "",
+      background: "",
+      conclusion: "",
+      rawEmail: "新規本文",
+      gmailThreadId: "thread-abc",
+      tags: [],
+    });
+
+    expect(thread.id).toBe("existing-id");
+    expect(thread.subject).toBe("既存");
+    expect(thread.gmailThreadId).toBe("thread-abc");
+    expect(execute).not.toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO support_threads"),
+      expect.anything(),
+    );
+  });
+
   it("falls back to LIKE search when FTS fails", async () => {
     const db = createDatabaseMock({
       rows: [
