@@ -8,6 +8,7 @@ vi.mock("@/lib/freee/session-client", () => ({
 }));
 vi.mock("@/lib/freee/invoice", () => ({
   createInvoice: (...args: unknown[]) => createInvoiceMock(...args),
+  createInvoiceResilient: (...args: unknown[]) => createInvoiceMock(...args),
 }));
 vi.mock("@/lib/freee/memo-tag", () => ({
   getAppMemoTagId: vi.fn().mockResolvedValue(7),
