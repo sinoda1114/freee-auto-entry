@@ -19,9 +19,11 @@ import {
   type InvoiceTemplateLine,
 } from "@/lib/db/recurring-invoices";
 import { getDatabase } from "@/lib/db/turso";
-import { createInvoice, FreeeInvoiceApiError } from "@/lib/freee/invoice";
+import { createInvoiceResilient, FreeeInvoiceApiError } from "@/lib/freee/invoice";
 import { getAppMemoTagId } from "@/lib/freee/memo-tag";
 import { getValidFreeeAuth } from "@/lib/freee/session-client";
+import { reconcileRecurringInvoiceHistory } from "@/lib/invoices/reconcile-recurring";
+import { formatTokyoMonth } from "@/lib/date";
 
 export interface TemplateActionState {
   status: "idle" | "success" | "error";
@@ -401,7 +403,7 @@ export async function generateRecurringInvoiceAction(
       const memoTagId = await getAppMemoTagId(auth);
       await markInvoiceGenerationStarted(db, generationClaim);
       externalCallStarted = true;
-      invoice = await createInvoice(auth, {
+      invoice = await createInvoiceResilient(auth, {
         billingDate,
         ...(paymentDate ? { paymentDate } : {}),
         partnerId: template.partnerId,
@@ -411,6 +413,9 @@ export async function generateRecurringInvoiceAction(
         sendingMethod: template.sendingMethod,
         ...(template.invoiceTemplateId
           ? { templateId: template.invoiceTemplateId }
+          : {}),
+        ...(String(formData.get("invoiceNumber") ?? "").trim()
+          ? { invoiceNumber: String(formData.get("invoiceNumber")).trim() }
           : {}),
         lines,
         memoTagIds: [memoTagId],
@@ -660,7 +665,7 @@ export async function bulkGenerateRecurringInvoicesAction(
     try {
       await markInvoiceGenerationStarted(db, generationClaim);
       externalCallStarted = true;
-      invoice = await createInvoice(auth, {
+      invoice = await createInvoiceResilient(auth, {
         billingDate,
         ...(paymentDate ? { paymentDate } : {}),
         partnerId: template.partnerId,
@@ -781,4 +786,72 @@ export async function bulkGenerateRecurringInvoicesAction(
   revalidatePath("/recurring-invoices");
   revalidatePath("/invoices");
   return { status: "done", results };
+}
+
+function previousMonths(count: number, from = formatTokyoMonth()): string[] {
+  const [yearRaw, monthRaw] = from.split("-");
+  let year = Number(yearRaw);
+  let month = Number(monthRaw);
+  const months: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    months.push(`${year}-${String(month).padStart(2, "0")}`);
+    month -= 1;
+    if (month === 0) {
+      month = 12;
+      year -= 1;
+    }
+  }
+  return months;
+}
+
+export type ReconcileRecurringState =
+  | { status: "idle" }
+  | {
+      status: "success";
+      message: string;
+      linked: number;
+      alreadyLinked: number;
+      unmatched: number;
+    }
+  | { status: "error"; message: string };
+
+export async function reconcileRecurringInvoicesAction(
+  _prev: ReconcileRecurringState,
+  formData: FormData,
+): Promise<ReconcileRecurringState> {
+  const auth = await getValidFreeeAuth();
+  if (!auth) {
+    return { status: "error", message: "freeeへ再連携してください。" };
+  }
+  if (String(formData.get("companyId") ?? "") !== auth.companyId) {
+    return {
+      status: "error",
+      message: "事業所が切り替わりました。画面を更新してください。",
+    };
+  }
+
+  try {
+    const db = getDatabase();
+    const result = await reconcileRecurringInvoiceHistory({
+      auth,
+      db,
+      targetMonths: previousMonths(6),
+    });
+    revalidatePath("/recurring-invoices");
+    revalidatePath("/invoices");
+    revalidatePath("/monthly-close");
+    return {
+      status: "success",
+      message: `freeeと突合しました。新規紐づけ ${result.linked} 件 / 既存 ${result.alreadyLinked} 件 / 未一致 ${result.unmatched} 件`,
+      linked: result.linked,
+      alreadyLinked: result.alreadyLinked,
+      unmatched: result.unmatched,
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof Error ? error.message : "突合に失敗しました。",
+    };
+  }
 }

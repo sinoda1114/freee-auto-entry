@@ -4,6 +4,7 @@ import { Button, Chip } from "@heroui/react";
 import NextLink from "next/link";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
+import { ReconcileInvoicesButton } from "@/app/components/ReconcileInvoicesButton";
 import type { RecurringInvoiceTemplate } from "@/lib/db/recurring-invoices";
 import { BulkGeneratePanel } from "./BulkGeneratePanel";
 import { DeleteTemplateForm } from "./DeleteTemplateForm";
@@ -36,6 +37,7 @@ export function RecurringInvoicesView({
         description="必要な月だけ内容を確認して請求書を作成します。自動生成はしません。"
         actions={
           <>
+            <ReconcileInvoicesButton companyId={companyId} />
             <Button
               as={NextLink}
               href="/recurring-invoices/from-invoice"

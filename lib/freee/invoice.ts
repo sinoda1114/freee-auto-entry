@@ -1,4 +1,8 @@
 import type { FreeeAuth } from "./accounting";
+import {
+  generateInvoiceNumber,
+  isInvoiceNumberRequiredError,
+} from "./invoice-number";
 
 const INVOICE_API_BASE = "https://api.freee.co.jp/iv";
 
@@ -18,6 +22,7 @@ export interface CreateInvoiceInput {
   emailCc?: string;
   sendingMethod?: "email" | "posting" | "email_and_posting";
   templateId?: number;
+  invoiceNumber?: string;
   lines: InvoiceLineInput[];
   memoTagIds?: number[];
 }
@@ -51,6 +56,7 @@ export interface InvoiceSummary {
   paymentDate?: string;
   sendingStatus: "sent" | "unsent";
   paymentStatus: "settled" | "unsettled" | "canceled";
+  dealStatus: "registered" | "unregistered";
   totalAmount: number;
   partnerId: number;
   partnerName: string;
@@ -87,6 +93,9 @@ function parseInvoiceSummary(value: unknown): InvoiceSummary {
     (value.payment_status !== "settled" &&
       value.payment_status !== "unsettled" &&
       value.payment_status !== "canceled") ||
+    (value.deal_status !== "registered" &&
+      value.deal_status !== "unregistered" &&
+      value.deal_status !== undefined) ||
     typeof value.total_amount !== "number" ||
     typeof value.partner_id !== "number" ||
     typeof value.report_url !== "string"
@@ -108,6 +117,10 @@ function parseInvoiceSummary(value: unknown): InvoiceSummary {
     paymentDate: optionalString(value.payment_date),
     sendingStatus: value.sending_status,
     paymentStatus: value.payment_status,
+    dealStatus:
+      value.deal_status === "registered" || value.deal_status === "unregistered"
+        ? value.deal_status
+        : "unregistered",
     totalAmount: value.total_amount,
     partnerId: value.partner_id,
     partnerName:
@@ -146,6 +159,9 @@ export async function createInvoice(
         ? { partner_sending_method: input.sendingMethod }
         : {}),
       ...(input.templateId ? { template_id: input.templateId } : {}),
+      ...(input.invoiceNumber
+        ? { invoice_number: input.invoiceNumber }
+        : {}),
       tax_entry_method: "out",
       tax_fraction: "omit",
       withholding_tax_entry_method: "out",
@@ -179,17 +195,71 @@ export async function createInvoice(
   return { id: data.invoice.id, reportUrl: data.invoice.report_url };
 }
 
+/** Create invoice; if auto-numbering is off, retry once with a generated number. */
+export async function createInvoiceResilient(
+  auth: FreeeAuth,
+  input: CreateInvoiceInput,
+): Promise<CreatedInvoice> {
+  try {
+    return await createInvoice(auth, input);
+  } catch (error) {
+    if (input.invoiceNumber || !isInvoiceNumberRequiredError(error)) {
+      throw error;
+    }
+    return createInvoice(auth, {
+      ...input,
+      invoiceNumber: generateInvoiceNumber({
+        billingDate: input.billingDate,
+        partnerId: input.partnerId,
+      }),
+    });
+  }
+}
+
+export type GetInvoicesFilters = {
+  offset: number;
+  limit: number;
+  startBillingDate?: string;
+  endBillingDate?: string;
+  partnerIds?: number[];
+  paymentStatus?: "settled" | "unsettled" | "canceled";
+  dealStatus?: "registered" | "unregistered";
+  sendingStatus?: "sent" | "unsent";
+};
+
 export async function getInvoices(
   auth: FreeeAuth,
-  pagination: { offset: number; limit: number },
+  pagination: GetInvoicesFilters,
 ): Promise<InvoiceSummary[]> {
   const params = new URLSearchParams({
     company_id: auth.companyId,
     offset: String(pagination.offset),
     limit: String(pagination.limit),
   });
+  if (pagination.startBillingDate) {
+    params.set("start_billing_date", pagination.startBillingDate);
+  }
+  if (pagination.endBillingDate) {
+    params.set("end_billing_date", pagination.endBillingDate);
+  }
+  if (pagination.partnerIds && pagination.partnerIds.length > 0) {
+    params.set(
+      "partner_ids",
+      pagination.partnerIds.slice(0, 3).map(String).join(","),
+    );
+  }
+  if (pagination.paymentStatus) {
+    params.set("payment_status", pagination.paymentStatus);
+  }
+  if (pagination.dealStatus) {
+    params.set("deal_status", pagination.dealStatus);
+  }
+  if (pagination.sendingStatus) {
+    params.set("sending_status", pagination.sendingStatus);
+  }
   const response = await fetch(`${INVOICE_API_BASE}/invoices?${params}`, {
     headers: { Authorization: `Bearer ${auth.accessToken}` },
+    cache: "no-store",
   });
   if (!response.ok) {
     throw new Error(`freee invoice API request failed: ${response.status}`);

@@ -1,7 +1,7 @@
 "use server";
 
 import { getAppMemoTagId } from "@/lib/freee/memo-tag";
-import { createInvoice } from "@/lib/freee/invoice";
+import { createInvoiceResilient } from "@/lib/freee/invoice";
 import { getValidFreeeAuth } from "@/lib/freee/session-client";
 
 export interface InvoiceFormState {
@@ -86,7 +86,7 @@ export async function createInvoiceAction(
 
   try {
     const memoTagId = await getAppMemoTagId(auth);
-    const invoice = await createInvoice(auth, {
+    const invoice = await createInvoiceResilient(auth, {
       billingDate,
       ...(paymentDate ? { paymentDate } : {}),
       partnerId,
@@ -94,6 +94,9 @@ export async function createInvoiceAction(
       ...(emailTo ? { emailTo } : {}),
       ...(emailCc ? { emailCc } : {}),
       ...(emailTo ? { sendingMethod: "email" } : {}),
+      ...(String(formData.get("invoiceNumber") ?? "").trim()
+        ? { invoiceNumber: String(formData.get("invoiceNumber")).trim() }
+        : {}),
       lines,
       memoTagIds: [memoTagId],
     });

@@ -110,6 +110,47 @@ describe("createInvoice", () => {
       }),
     ).rejects.toThrow(/422/);
   });
+
+  it("retries with a generated invoice_number when auto-numbering is disabled", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        text: async () =>
+          JSON.stringify({
+            errors: [
+              {
+                messages: ["自動採番が無効なので、invoice_number は必須です。"],
+              },
+            ],
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          invoice: {
+            id: 9,
+            report_url: "https://invoice.secure.freee.co.jp/reports/invoices/9",
+          },
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { createInvoiceResilient } = await import("./invoice");
+    const result = await createInvoiceResilient(auth, {
+      billingDate: "2026-07-19",
+      partnerId: 55,
+      lines: [
+        { description: "月次", quantity: 1, unitPrice: 1000, taxRate: 10 },
+      ],
+    });
+
+    expect(result.id).toBe(9);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const secondBody = JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string);
+    expect(secondBody.invoice_number).toMatch(/^20260719-55-/);
+  });
 });
 
 describe("getInvoices", () => {

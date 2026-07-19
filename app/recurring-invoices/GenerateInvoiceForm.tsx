@@ -175,6 +175,17 @@ export function GenerateInvoiceForm({
             className="form-input"
           />
         </label>
+        <label className="form-label md:col-span-3">
+          請求書番号（任意）
+          <input
+            name="invoiceNumber"
+            placeholder="空欄なら自動採番。無効時はこちらを入力または自動で付与します"
+            className="form-input"
+          />
+          <span className="mt-1 block text-xs text-[var(--freee-text-muted)]">
+            freeeで自動採番がオフの場合に必要です。空欄のままでも作成時に自動付与を試します。
+          </span>
+        </label>
       </div>
 
       <fieldset className="grid gap-3">
