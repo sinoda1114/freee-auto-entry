@@ -233,7 +233,7 @@ export function WalletTransactionsView({
                   }
                   className={
                     isOpen
-                      ? "relative z-[1] my-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-[color-mix(in_srgb,var(--freee-blue)_45%,var(--freee-border))] bg-[color-mix(in_srgb,var(--freee-blue)_8%,var(--freee-surface))] px-3 py-2 shadow-sm"
+                      ? "relative z-[1] my-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border-2 border-[var(--freee-blue)]/55 border-l-[4px] border-l-[var(--freee-blue)] bg-[color-mix(in_srgb,var(--freee-blue)_16%,var(--freee-surface))] px-3 py-2.5 shadow-md"
                       : "flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2"
                   }
                 >
