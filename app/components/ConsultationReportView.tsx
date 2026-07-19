@@ -135,7 +135,7 @@ export function ConsultationReportView({
                     color={LIKELIHOOD_CHIP_COLOR[hypothesis.likelihood]}
                     classNames={{ content: "text-[11px] font-semibold" }}
                   >
-                    尤度 {formatLikelihood(hypothesis.likelihood)}
+                    確率 {formatLikelihood(hypothesis.likelihood)}
                   </Chip>
                   <p className="text-sm font-semibold text-[var(--freee-text)]">
                     {hypothesis.title}
