@@ -221,11 +221,21 @@ export function WalletTransactionsView({
                 item.matchedRule ??
                 matchUserMatcher(transaction, matchers, walletableName);
               const selected = selectedIds.has(transaction.id);
+              const isOpen =
+                item.category !== "rule_matched" &&
+                openMatcherTxnId === transaction.id;
 
               return (
                 <article
                   key={transaction.id}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2"
+                  aria-expanded={
+                    item.category !== "rule_matched" ? isOpen : undefined
+                  }
+                  className={
+                    isOpen
+                      ? "relative z-[1] my-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-[color-mix(in_srgb,var(--freee-blue)_45%,var(--freee-border))] bg-[color-mix(in_srgb,var(--freee-blue)_8%,var(--freee-surface))] px-3 py-2 shadow-sm"
+                      : "flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2"
+                  }
                 >
                   <Checkbox
                     aria-label={`${transaction.description} を選択`}
