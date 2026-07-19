@@ -31,25 +31,6 @@ function loadEnvLocal() {
     console.warn(".env.local not found, using existing environment variables");
   }
 }
-  for (const line of text.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) {
-      continue;
-    }
-    const idx = trimmed.indexOf("=");
-    const key = trimmed.slice(0, idx);
-    let value = trimmed.slice(idx + 1);
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    if (!(key in process.env)) {
-      process.env[key] = value;
-    }
-  }
-}
 
 async function main() {
   loadEnvLocal();
