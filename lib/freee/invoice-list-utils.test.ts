@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  billingDateWindowMonthsBack,
   filterInvoicesByQuery,
+  paginateInvoices,
   sortInvoicesByBillingDateDesc,
 } from "./invoice-list-utils";
 import type { InvoiceSummary } from "./invoice";
@@ -32,6 +34,35 @@ describe("sortInvoicesByBillingDateDesc", () => {
       "2026-07-31",
       "2026-06-30",
       "2026-05-31",
+    ]);
+  });
+});
+
+describe("billingDateWindowMonthsBack", () => {
+  it("starts at the first day of the month monthsBack ago", () => {
+    expect(
+      billingDateWindowMonthsBack(24, new Date("2026-07-19T12:00:00Z")),
+    ).toEqual({
+      startBillingDate: "2024-07-01",
+      endBillingDate: "2026-07-19",
+    });
+  });
+});
+
+describe("paginateInvoices", () => {
+  it("pages a newest-first list without reordering", () => {
+    const invoices = [
+      { ...baseInvoice, id: 3, billingDate: "2026-07-07" },
+      { ...baseInvoice, id: 2, billingDate: "2026-06-10" },
+      { ...baseInvoice, id: 1, billingDate: "2024-10-31" },
+    ];
+    expect(paginateInvoices(invoices, 1, 2)).toEqual({
+      invoices: [invoices[0], invoices[1]],
+      hasNext: true,
+      total: 3,
+    });
+    expect(paginateInvoices(invoices, 2, 2).invoices.map((i) => i.id)).toEqual([
+      1,
     ]);
   });
 });

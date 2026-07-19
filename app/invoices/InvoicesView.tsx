@@ -3,11 +3,13 @@
 import { Button, Chip } from "@heroui/react";
 import NextLink from "next/link";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState } from "react";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
 import { ReconcileInvoicesButton } from "@/app/components/ReconcileInvoicesButton";
+import { reconcileRecurringInvoicesAction } from "@/app/recurring-invoices/actions";
 import type { InvoiceSummary } from "@/lib/freee/invoice";
+import { sortInvoicesByBillingDateDesc } from "@/lib/freee/invoice-list-utils";
 
 interface InvoicesViewProps {
   companyId: string;
@@ -35,21 +37,26 @@ export function InvoicesView({
   hasNext,
 }: InvoicesViewProps) {
   const router = useRouter();
-  const [isRefreshing, startRefresh] = useTransition();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
 
-  const sorted = [...invoices].sort((left, right) => {
-    if (left.sendingStatus === right.sendingStatus) {
-      return right.billingDate.localeCompare(left.billingDate);
-    }
-    return left.sendingStatus === "unsent" ? -1 : 1;
-  });
+  // Already newest-first from server; keep unsent prioritization for ops.
+  const sorted = [...sortInvoicesByBillingDateDesc(invoices)].sort(
+    (left, right) => {
+      if (left.sendingStatus === right.sendingStatus) {
+        return 0;
+      }
+      return left.sendingStatus === "unsent" ? -1 : 1;
+    },
+  );
 
   return (
     <PageShell>
       <PageHeader
         eyebrow="Delivery control"
         title="請求書"
-        description="freeeの請求書を表示します。定型請求との差分は「突合」で埋められます。"
+        description="直近の請求書を最新順で表示します。再取得で freee と突合もします。"
         actions={
           <>
             <ReconcileInvoicesButton companyId={companyId} />
@@ -57,7 +64,33 @@ export function InvoicesView({
               variant="bordered"
               size="sm"
               isLoading={isRefreshing}
-              onPress={() => startRefresh(() => router.refresh())}
+              onPress={() => {
+                void (async () => {
+                  setRefreshMessage(null);
+                  setRefreshError(null);
+                  setIsRefreshing(true);
+                  try {
+                    const formData = new FormData();
+                    formData.set("companyId", companyId);
+                    const result = await reconcileRecurringInvoicesAction(
+                      { status: "idle" },
+                      formData,
+                    );
+                    if (result.status === "error") {
+                      setRefreshError(
+                        result.message ?? "再取得に失敗しました。",
+                      );
+                      return;
+                    }
+                    if (result.status === "success") {
+                      setRefreshMessage(result.message ?? null);
+                    }
+                    router.refresh();
+                  } finally {
+                    setIsRefreshing(false);
+                  }
+                })();
+              }}
             >
               freeeから再取得
             </Button>
@@ -73,16 +106,27 @@ export function InvoicesView({
         }
       />
 
+      {refreshMessage ? (
+        <p className="mt-2 text-xs text-[var(--freee-text-muted)]">
+          {refreshMessage}
+        </p>
+      ) : null}
+      {refreshError ? (
+        <p role="alert" className="mt-2 text-xs text-danger">
+          {refreshError}
+        </p>
+      ) : null}
+
       <div className="mt-5 grid gap-2 sm:grid-cols-3">
         <div className="rounded-[var(--radius-panel)] bg-amber-50 px-3 py-2.5 text-amber-950 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-800">
           <p className="text-[10px] font-semibold uppercase tracking-wide">
-            送付待ち
+            送付待ち（直近）
           </p>
           <p className="stat-value mt-0.5">{unsentCount}</p>
         </div>
         <div className="rounded-[var(--radius-panel)] bg-orange-50 px-3 py-2.5 text-orange-950 ring-1 ring-orange-200 dark:bg-orange-950/40 dark:text-orange-100 dark:ring-orange-800">
           <p className="text-[10px] font-semibold uppercase tracking-wide">
-            未入金
+            未入金（直近）
           </p>
           <p className="stat-value mt-0.5">{unsettledCount}</p>
         </div>

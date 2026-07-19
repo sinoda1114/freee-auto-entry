@@ -111,7 +111,34 @@ describe("createInvoice", () => {
     ).rejects.toThrow(/422/);
   });
 
-  it("retries with a generated invoice_number when auto-numbering is disabled", async () => {
+  it("sends a generated invoice_number on the first create attempt", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        invoice: {
+          id: 9,
+          report_url: "https://invoice.secure.freee.co.jp/reports/invoices/9",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { createInvoiceResilient } = await import("./invoice");
+    const result = await createInvoiceResilient(auth, {
+      billingDate: "2026-07-19",
+      partnerId: 55,
+      lines: [
+        { description: "月次", quantity: 1, unitPrice: 1000, taxRate: 10 },
+      ],
+    });
+
+    expect(result.id).toBe(9);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string);
+    expect(body.invoice_number).toMatch(/^20260719-55-/);
+  });
+
+  it("retries without invoice_number when auto-numbering forbids a supplied number", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
@@ -121,7 +148,9 @@ describe("createInvoice", () => {
           JSON.stringify({
             errors: [
               {
-                messages: ["自動採番が無効なので、invoice_number は必須です。"],
+                messages: [
+                  "自動採番するので、invoice_number は指定できません。",
+                ],
               },
             ],
           }),
@@ -130,8 +159,8 @@ describe("createInvoice", () => {
         ok: true,
         json: async () => ({
           invoice: {
-            id: 9,
-            report_url: "https://invoice.secure.freee.co.jp/reports/invoices/9",
+            id: 10,
+            report_url: "https://invoice.secure.freee.co.jp/reports/invoices/10",
           },
         }),
       });
@@ -146,10 +175,10 @@ describe("createInvoice", () => {
       ],
     });
 
-    expect(result.id).toBe(9);
+    expect(result.id).toBe(10);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const secondBody = JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string);
-    expect(secondBody.invoice_number).toMatch(/^20260719-55-/);
+    expect(secondBody.invoice_number).toBeUndefined();
   });
 });
 
@@ -195,6 +224,36 @@ describe("getInvoices", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toContain(
       "company_id=999&offset=0&limit=100",
     );
+  });
+
+  it("skips invalid rows instead of failing the whole list", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        invoices: [
+          { id: "broken" },
+          {
+            id: 2,
+            company_id: 999,
+            invoice_number: 2026070023,
+            subject: "有効な請求",
+            billing_date: "2026-07-07",
+            sending_status: "sent",
+            payment_status: "unsettled",
+            total_amount: 22000,
+            partner_id: 55,
+            partner_name: "取引先A",
+            report_url:
+              "https://invoice.secure.freee.co.jp/reports/invoices/2",
+          },
+        ],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const invoices = await getInvoices(auth, { offset: 0, limit: 100 });
+    expect(invoices).toHaveLength(1);
+    expect(invoices[0]?.invoiceNumber).toBe("2026070023");
   });
 });
 

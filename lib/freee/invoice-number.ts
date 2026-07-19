@@ -22,3 +22,15 @@ export function isInvoiceNumberRequiredError(error: unknown): boolean {
       error.message.includes("自動採番が無効"))
   );
 }
+
+/** Auto-numbering is ON — freee rejects a client-supplied invoice_number. */
+export function isInvoiceNumberForbiddenError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return (
+    error.message.includes("invoice_number") &&
+    (error.message.includes("指定できません") ||
+      error.message.includes("自動採番する"))
+  );
+}
