@@ -1,6 +1,7 @@
 "use client";
 
-import { Autocomplete, AutocompleteItem, Button } from "@heroui/react";
+import { Autocomplete, AutocompleteItem, Button, Tooltip } from "@heroui/react";
+import { motion, useReducedMotion } from "framer-motion";
 import { useActionState, useMemo, useState } from "react";
 import {
   resolveTaxNameForAccountItem,
@@ -26,6 +27,20 @@ const CONDITION_LABELS: Record<CreateMatcherCondition, string> = {
   2: "後方一致",
   3: "完全一致",
 };
+
+const MATCH_CONDITION_HELP = (
+  <div className="max-w-xs space-y-1.5 text-left text-xs leading-relaxed">
+    <p>
+      明細の摘要を、自動登録ルールの文言とどう比べるかを選びます。
+    </p>
+    <ul className="list-disc space-y-0.5 pl-3.5">
+      <li>完全一致: 摘要が文言とまったく同じときだけ</li>
+      <li>部分一致: 摘要のどこかに文言が含まれるとき</li>
+      <li>前方一致: 摘要が文言で始まるとき</li>
+      <li>後方一致: 摘要が文言で終わるとき</li>
+    </ul>
+  </div>
+);
 
 type AppliedSuggestion = {
   accountItemName: string;
@@ -225,6 +240,7 @@ function MatcherRulePanelForm({
   const [llmError, setLlmError] = useState<string | null>(null);
   const [aiSuggestions, setAiSuggestions] = useState<AppliedSuggestion[]>([]);
   const [selectedAiIndex, setSelectedAiIndex] = useState(0);
+  const reduceMotion = useReducedMotion();
 
   function applySuggestionFields(next: {
     accountItemName: string;
@@ -353,79 +369,134 @@ function MatcherRulePanelForm({
           </p>
         ) : null}
       </div>
-      <label className="grid gap-0.5 text-sm">
-        <span className="text-xs font-semibold">一致方法</span>
-        <select
-          name="condition"
-          value={String(condition)}
-          onChange={(event) =>
-            setCondition(Number(event.target.value) as CreateMatcherCondition)
-          }
-          className={fieldClassName}
-        >
-          <option value="3">完全一致</option>
-          <option value="0">部分一致</option>
-          <option value="1">前方一致</option>
-          <option value="2">後方一致</option>
-        </select>
-      </label>
-      <Autocomplete
-        key={`account-item-${formFieldKey}`}
-        label="勘定科目"
-        aria-label="勘定科目"
-        placeholder="科目名で検索"
-        selectedKey={accountItemName || null}
-        inputValue={accountItemName}
-        onInputChange={setAccountItemName}
-        onSelectionChange={(key) => {
-          const nextAccountItemName = key?.toString() ?? "";
-          setAccountItemName(nextAccountItemName);
-          const nextTaxName = resolveTaxNameForAccountItem(
-            nextAccountItemName,
-            accountItems,
-            taxCodes,
-          );
-          if (nextTaxName) {
-            setTaxName(nextTaxName);
-          }
+      <motion.div
+        key={formFieldKey}
+        initial={
+          formFieldKey === 0 || reduceMotion
+            ? false
+            : {
+                opacity: 0.2,
+                y: 8,
+              }
+        }
+        animate={{
+          opacity: 1,
+          y: 0,
+          boxShadow:
+            formFieldKey === 0 || reduceMotion
+              ? "0 0 0 0 transparent"
+              : [
+                  "0 0 0 0 transparent",
+                  "0 0 0 3px color-mix(in srgb, var(--freee-blue) 35%, transparent)",
+                  "0 0 0 0 transparent",
+                ],
         }}
-        isRequired
-        size="sm"
-        variant="bordered"
-        classNames={{
-          base: "text-sm",
-          listboxWrapper: "max-h-56",
+        transition={{
+          opacity: { duration: 0.28, ease: "easeOut" },
+          y: { duration: 0.28, ease: "easeOut" },
+          boxShadow: { duration: 0.55, ease: "easeOut" },
         }}
-        inputProps={{
-          classNames: {
-            inputWrapper:
-              "border-[var(--freee-border)] bg-[var(--freee-surface)]",
-          },
-        }}
+        className="col-span-full grid grid-cols-1 gap-3 rounded-md sm:col-span-2 sm:grid-cols-2"
       >
-        {accountItems.map((item) => (
-          <AutocompleteItem key={item.name} textValue={item.name}>
-            {item.name}
-          </AutocompleteItem>
-        ))}
-      </Autocomplete>
-      <label className="grid gap-0.5 text-sm sm:col-span-2">
-        <span className="text-xs font-semibold">税区分</span>
-        <select
-          name="taxNameDisplay"
-          value={taxName}
-          onChange={(event) => setTaxName(event.target.value)}
-          required
-          className={fieldClassName}
+        <div className="grid gap-0.5 text-sm">
+          <div className="flex items-center gap-1">
+            <label
+              htmlFor="matcher-condition"
+              className="text-xs font-semibold text-[var(--freee-text)]"
+            >
+              自動登録ルールの一致方法
+            </label>
+            <Tooltip
+              content={MATCH_CONDITION_HELP}
+              placement="top-start"
+              size="sm"
+              classNames={{
+                content:
+                  "bg-[var(--freee-surface)] px-3 py-2 text-[var(--freee-text)] shadow-md ring-1 ring-[var(--freee-border)]",
+              }}
+            >
+              <button
+                type="button"
+                aria-label="自動登録ルールの一致方法の説明"
+                className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-[var(--freee-border)] text-[10px] font-bold leading-none text-[var(--freee-text-muted)] transition hover:border-[var(--freee-blue)]/50 hover:text-[var(--freee-blue)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--freee-blue)]"
+              >
+                ?
+              </button>
+            </Tooltip>
+          </div>
+          <select
+            id="matcher-condition"
+            name="condition"
+            aria-label="自動登録ルールの一致方法"
+            value={String(condition)}
+            onChange={(event) =>
+              setCondition(Number(event.target.value) as CreateMatcherCondition)
+            }
+            className={fieldClassName}
+          >
+            <option value="3">完全一致</option>
+            <option value="0">部分一致</option>
+            <option value="1">前方一致</option>
+            <option value="2">後方一致</option>
+          </select>
+        </div>
+        <Autocomplete
+          label="勘定科目"
+          aria-label="勘定科目"
+          placeholder="科目名で検索"
+          selectedKey={accountItemName || null}
+          inputValue={accountItemName}
+          onInputChange={setAccountItemName}
+          onSelectionChange={(key) => {
+            const nextAccountItemName = key?.toString() ?? "";
+            setAccountItemName(nextAccountItemName);
+            const nextTaxName = resolveTaxNameForAccountItem(
+              nextAccountItemName,
+              accountItems,
+              taxCodes,
+            );
+            if (nextTaxName) {
+              setTaxName(nextTaxName);
+            }
+          }}
+          isRequired
+          size="sm"
+          variant="bordered"
+          classNames={{
+            base: "text-sm",
+            listboxWrapper: "max-h-56",
+          }}
+          inputProps={{
+            classNames: {
+              inputWrapper:
+                "border-[var(--freee-border)] bg-[var(--freee-surface)]",
+            },
+          }}
         >
-          <option value="">選択してください</option>
-          {taxCodes.map((tax) => (
-            <option key={tax.code} value={tax.name}>
-              {tax.name}
-            </option>
+          {accountItems.map((item) => (
+            <AutocompleteItem key={item.name} textValue={item.name}>
+              {item.name}
+            </AutocompleteItem>
           ))}
-        </select>
-      </label>
+        </Autocomplete>
+        <label className="grid gap-0.5 text-sm sm:col-span-2">
+          <span className="text-xs font-semibold">税区分</span>
+          <select
+            name="taxNameDisplay"
+            value={taxName}
+            onChange={(event) => setTaxName(event.target.value)}
+            required
+            className={fieldClassName}
+          >
+            <option value="">選択してください</option>
+            {taxCodes.map((tax) => (
+              <option key={tax.code} value={tax.name}>
+                {tax.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </motion.div>
       <label className="flex items-start gap-2 text-sm sm:col-span-2">
         <input
           type="checkbox"
