@@ -61,7 +61,7 @@ export function findMatchingInvoice(
   }
   return [...candidates].sort((a, b) =>
     b.billingDate.localeCompare(a.billingDate),
-  )[0]!;
+  )[0] ?? null;
 }
 
 function monthRange(targetMonth: string): {
