@@ -22,6 +22,7 @@ export type ListInvoicesForUiResult = {
 
 /**
  * freee 一覧 API は古い順のため、日付窓内を全件取得して最新順にページングする。
+ * 取消済みは freee UI と同様に除外する。
  */
 export async function listInvoicesForUi(
   auth: FreeeAuth,
@@ -63,6 +64,8 @@ async function fetchAllInWindow(
       limit: 100,
       startBillingDate: window.startBillingDate,
       endBillingDate: window.endBillingDate,
+      // Match freee UI: exclude canceled invoices from list / 送付待ち counts
+      cancelStatus: "uncanceled",
     });
     collected.push(...page.invoices);
     if (page.invoices.length === 0 || page.fetchedCount < 100) {

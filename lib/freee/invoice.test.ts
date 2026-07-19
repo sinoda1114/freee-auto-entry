@@ -213,7 +213,11 @@ describe("getInvoices", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const invoices = await getInvoices(auth, { offset: 0, limit: 100 });
+    const invoices = await getInvoices(auth, {
+      offset: 0,
+      limit: 100,
+      cancelStatus: "uncanceled",
+    });
 
     expect(invoices[0]).toMatchObject({
       id: 1,
@@ -221,8 +225,8 @@ describe("getInvoices", () => {
       downloadedStatus: "undownloaded",
       partnerName: "取引先A",
     });
-    expect(fetchMock.mock.calls[0]?.[0]).toContain(
-      "company_id=999&offset=0&limit=100",
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      "cancel_status=uncanceled",
     );
   });
 
