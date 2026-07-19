@@ -58,6 +58,9 @@ describe("listInvoicesForUi", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
       "end_billing_date=2026-07-19",
     );
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      "cancel_status=uncanceled",
+    );
   });
 
   it("keeps paging when soft-parse drops some rows in a full page", async () => {

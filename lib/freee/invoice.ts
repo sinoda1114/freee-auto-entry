@@ -258,6 +258,7 @@ export type GetInvoicesFilters = {
   paymentStatus?: "settled" | "unsettled" | "canceled";
   dealStatus?: "registered" | "unregistered";
   sendingStatus?: "sent" | "unsent";
+  cancelStatus?: "canceled" | "uncanceled";
 };
 
 export type InvoiceListPage = {
@@ -296,6 +297,9 @@ export async function getInvoiceListPage(
   if (pagination.sendingStatus) {
     params.set("sending_status", pagination.sendingStatus);
   }
+  if (pagination.cancelStatus) {
+    params.set("cancel_status", pagination.cancelStatus);
+  }
   const response = await fetch(`${INVOICE_API_BASE}/invoices?${params}`, {
     headers: { Authorization: `Bearer ${auth.accessToken}` },
     cache: "no-store",
@@ -328,7 +332,11 @@ export async function getUnsentInvoiceCount(
 ): Promise<number> {
   let count = 0;
   for (let offset = 0; ; offset += pageSize) {
-    const page = await getInvoiceListPage(auth, { offset, limit: pageSize });
+    const page = await getInvoiceListPage(auth, {
+      offset,
+      limit: pageSize,
+      cancelStatus: "uncanceled",
+    });
     count += page.invoices.filter(
       (invoice) => invoice.sendingStatus === "unsent",
     ).length;
