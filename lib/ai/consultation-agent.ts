@@ -10,7 +10,11 @@ import {
 } from "@/lib/ai/consultation-recipes";
 import { detectResponseMode } from "@/lib/ai/consultation-intent";
 import { parseConsultationTarget } from "@/lib/ai/consultation-target";
-import { getGeminiApiKey, getGeminiModel, GeminiApiError } from "@/lib/ai/gemini";
+import { getGeminiApiKey, GeminiApiError } from "@/lib/ai/gemini";
+import {
+  logConsultationModelRoute,
+  resolveConsultationModel,
+} from "@/lib/ai/consultation-model-route";
 import { isE2ETestMode } from "@/lib/e2e/fixtures";
 
 /** エージェントに渡す直近の会話（最新ターンの直前まで） */
@@ -170,15 +174,19 @@ export async function runConsultationAgent(
   }
 
   const google = createGoogleGenerativeAI({ apiKey });
-  const modelId = getGeminiModel();
-  const tools = createConsultationTools(input.auth);
   const history = input.history ?? [];
+  const route = await resolveConsultationModel({
+    question: input.question,
+    history,
+  });
+  logConsultationModelRoute(route, input.question);
+  const tools = createConsultationTools(input.auth);
   const system = buildConsultationSystemPrompt(input.question, history);
   const messages = toModelMessages(history, buildCurrentUserContent(input));
 
   try {
     const result = await generateText({
-      model: google(modelId),
+      model: google(route.modelId),
       system,
       messages,
       tools,
