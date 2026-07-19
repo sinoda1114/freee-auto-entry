@@ -65,7 +65,7 @@ async function fetchAllInWindow(
       endBillingDate: window.endBillingDate,
     });
     collected.push(...page.invoices);
-    if (page.fetchedCount < 100) {
+    if (page.invoices.length === 0 || page.fetchedCount < 100) {
       break;
     }
   }
