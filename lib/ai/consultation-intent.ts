@@ -42,10 +42,10 @@ const BS_PATTERN =
 const LEDGER_PATTERN = /総勘定元帳|元帳|general\s*ledger/i;
 const REPORT_OR_NUMBER_PATTERN =
   /損益|貸借|試算表|元帳|売上|利益|費用|資産|負債|純資産|今期|前期|年度|決算|数字|金額|見(て|る)|閲覧|確認/i;
-const INVESTIGATE_PATTERN =
+export const INVESTIGATE_PATTERN =
   /なぜ|何故|おかしい|原因|仮説|修正|問題|怪しい|調べて|分析して|どうして|間違|ミス|消込/;
-const PRESENT_PATTERN =
-  /表示|見せて|見せて|見せろ|教えて|ポイント|要約|一覧|どうなってる|いくら|金額は|見て/;
+export const PRESENT_PATTERN =
+  /表示|見せて|見せろ|教えて|ポイント|要約|一覧|どうなってる|いくら|金額は|見て/;
 
 /**
  * レポート表示依頼か、なぜ調査か。レポート系はデフォルト present。
