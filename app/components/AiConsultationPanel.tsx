@@ -226,6 +226,8 @@ export function AiConsultationPanel({
   const questionRef = useRef<HTMLTextAreaElement>(null);
   const generatedId = useId();
   const resolvedPanelId = panelId ?? `ai-consultation-panel-${generatedId}`;
+  const keyboardHintId = `${generatedId}-keyboard-hint`;
+  const canSubmit = question.trim().length > 0 && !isPending;
 
   const canClear =
     !isPending &&
@@ -386,6 +388,7 @@ export function AiConsultationPanel({
         <Textarea
           ref={questionRef as RefObject<HTMLTextAreaElement>}
           aria-label="相談内容"
+          aria-describedby={keyboardHintId}
           placeholder="例: 25年度の損益計算書のポイントは？ / なぜこの振替が現金になっている？"
           value={question}
           onValueChange={setQuestion}
@@ -415,8 +418,8 @@ export function AiConsultationPanel({
             }
           }}
         />
-        {showOpenInNewTab ? (
-          <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {showOpenInNewTab ? (
             <Button
               size="md"
               variant="bordered"
@@ -425,8 +428,24 @@ export function AiConsultationPanel({
             >
               別画面
             </Button>
-          </div>
-        ) : null}
+          ) : null}
+          <span
+            id={keyboardHintId}
+            className="hidden text-xs text-[var(--freee-text-muted)] sm:inline"
+          >
+            Enter で送信 / Shift+Enter で改行
+          </span>
+          <Button
+            size="md"
+            color="primary"
+            className="ml-auto font-semibold"
+            onPress={handleSubmit}
+            isDisabled={!canSubmit}
+            isLoading={isPending}
+          >
+            送信
+          </Button>
+        </div>
       </div>
     </div>
   );
