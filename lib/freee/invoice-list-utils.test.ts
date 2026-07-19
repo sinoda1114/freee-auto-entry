@@ -47,6 +47,16 @@ describe("billingDateWindowMonthsBack", () => {
       endBillingDate: "2026-07-19",
     });
   });
+
+  it("uses Tokyo calendar today so JST morning invoices are not cut off", () => {
+    // 2026-07-19 23:30 UTC == 2026-07-20 08:30 JST
+    expect(
+      billingDateWindowMonthsBack(24, new Date("2026-07-19T23:30:00.000Z")),
+    ).toEqual({
+      startBillingDate: "2024-07-01",
+      endBillingDate: "2026-07-20",
+    });
+  });
 });
 
 describe("paginateInvoices", () => {
