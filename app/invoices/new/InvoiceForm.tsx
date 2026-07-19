@@ -84,6 +84,18 @@ export function InvoiceForm({
         />
       </label>
 
+      <label className="flex flex-col gap-1">
+        <span className="text-sm text-zinc-600 dark:text-zinc-400">
+          請求書番号（任意）
+        </span>
+        <input
+          type="text"
+          name="invoiceNumber"
+          placeholder="自動採番オフ時は必須。空欄なら作成時に自動付与"
+          className="rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+        />
+      </label>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1">
           <span className="text-sm text-zinc-600 dark:text-zinc-400">

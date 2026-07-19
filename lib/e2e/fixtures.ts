@@ -116,6 +116,7 @@ export const e2eInvoiceSummaries: InvoiceSummary[] = [
     billingDate: "2026-07-01",
     sendingStatus: "unsent",
     paymentStatus: "unsettled",
+    dealStatus: "unregistered",
     totalAmount: 110000,
     partnerId: 1,
     partnerName: "株式会社サンプル",

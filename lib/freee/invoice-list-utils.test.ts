@@ -13,6 +13,7 @@ const baseInvoice: InvoiceSummary = {
   billingDate: "2026-06-30",
   sendingStatus: "sent",
   paymentStatus: "unsettled",
+    dealStatus: "unregistered",
   totalAmount: 110000,
   partnerId: 1,
   partnerName: "株式会社Waalsforce",

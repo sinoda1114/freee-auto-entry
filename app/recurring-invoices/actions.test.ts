@@ -46,6 +46,7 @@ vi.mock("@/lib/freee/invoice", async (importOriginal) => {
   return {
     ...actual,
     createInvoice: (...args: unknown[]) => createInvoiceMock(...args),
+    createInvoiceResilient: (...args: unknown[]) => createInvoiceMock(...args),
   };
 });
 vi.mock("@/lib/freee/memo-tag", () => ({

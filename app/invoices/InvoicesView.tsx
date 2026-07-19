@@ -6,12 +6,15 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
+import { ReconcileInvoicesButton } from "@/app/components/ReconcileInvoicesButton";
 import type { InvoiceSummary } from "@/lib/freee/invoice";
 
 interface InvoicesViewProps {
+  companyId: string;
   invoices: InvoiceSummary[];
   page: number;
   unsentCount: number;
+  unsettledCount: number;
   hasNext: boolean;
 }
 
@@ -24,9 +27,11 @@ function formatAmount(amount: number): string {
 }
 
 export function InvoicesView({
+  companyId,
   invoices,
   page,
   unsentCount,
+  unsettledCount,
   hasNext,
 }: InvoicesViewProps) {
   const router = useRouter();
@@ -44,9 +49,10 @@ export function InvoicesView({
       <PageHeader
         eyebrow="Delivery control"
         title="請求書"
-        description="送付待ちを先頭に表示します。送信後は再取得して状態を更新してください。"
+        description="freeeの請求書を表示します。定型請求との差分は「突合」で埋められます。"
         actions={
           <>
+            <ReconcileInvoicesButton companyId={companyId} />
             <Button
               variant="bordered"
               size="sm"
@@ -74,7 +80,13 @@ export function InvoicesView({
           </p>
           <p className="stat-value mt-0.5">{unsentCount}</p>
         </div>
-        <div className="panel px-3 py-2.5 sm:col-span-2">
+        <div className="rounded-[var(--radius-panel)] bg-orange-50 px-3 py-2.5 text-orange-950 ring-1 ring-orange-200 dark:bg-orange-950/40 dark:text-orange-100 dark:ring-orange-800">
+          <p className="text-[10px] font-semibold uppercase tracking-wide">
+            未入金
+          </p>
+          <p className="stat-value mt-0.5">{unsettledCount}</p>
+        </div>
+        <div className="panel px-3 py-2.5">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--freee-text-muted)]">
             このページの請求書
           </p>
@@ -134,6 +146,28 @@ export function InvoicesView({
                         ? "送付済み"
                         : "送付待ち"}
                     </Chip>
+                    <Chip
+                      size="sm"
+                      variant="flat"
+                      color={
+                        invoice.paymentStatus === "settled"
+                          ? "success"
+                          : invoice.paymentStatus === "canceled"
+                            ? "default"
+                            : "warning"
+                      }
+                    >
+                      {invoice.paymentStatus === "settled"
+                        ? "入金済"
+                        : invoice.paymentStatus === "canceled"
+                          ? "決済キャンセル"
+                          : "未入金"}
+                    </Chip>
+                    <Chip size="sm" variant="flat">
+                      {invoice.dealStatus === "registered"
+                        ? "取引登録済"
+                        : "登録待ち"}
+                    </Chip>
                     {invoice.downloadedStatus ? (
                       <Chip size="sm" variant="flat">
                         {invoice.downloadedStatus === "downloaded"
@@ -189,7 +223,9 @@ export function InvoicesView({
         ) : (
           <span />
         )}
-        <span className="font-mono text-sm text-[var(--freee-text-muted)]">PAGE {page}</span>
+        <span className="font-mono text-sm text-[var(--freee-text-muted)]">
+          PAGE {page}
+        </span>
         {hasNext ? (
           <Button
             as={NextLink}

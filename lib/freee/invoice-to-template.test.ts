@@ -11,6 +11,7 @@ const invoice: InvoiceDetail = {
   paymentDate: "2026-07-31",
   sendingStatus: "sent",
   paymentStatus: "unsettled",
+    dealStatus: "unregistered",
   totalAmount: 110000,
   partnerId: 87428281,
   partnerName: "株式会社Waalsforce",

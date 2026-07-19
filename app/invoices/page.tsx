@@ -49,12 +49,17 @@ export default async function InvoicesPage({
   const unsentCount = invoices.filter(
     (invoice) => invoice.sendingStatus === "unsent",
   ).length;
+  const unsettledCount = invoices.filter(
+    (invoice) => invoice.paymentStatus === "unsettled",
+  ).length;
 
   return (
     <InvoicesView
+      companyId={auth.companyId}
       invoices={invoices}
       page={page}
       unsentCount={unsentCount}
+      unsettledCount={unsettledCount}
       hasNext={invoices.length === PAGE_SIZE}
     />
   );
