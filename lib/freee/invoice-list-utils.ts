@@ -1,3 +1,4 @@
+import { formatTokyoDate } from "@/lib/date";
 import type { InvoiceSummary } from "./invoice";
 
 export function sortInvoicesByBillingDateDesc(
@@ -17,16 +18,17 @@ export function billingDateWindowMonthsBack(
   monthsBack: number,
   now = new Date(),
 ): { startBillingDate: string; endBillingDate: string } {
-  const end = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
-  const start = new Date(
-    Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - monthsBack, 1),
-  );
-  const toYmd = (value: Date) => value.toISOString().slice(0, 10);
+  // Invoice forms use Asia/Tokyo calendar dates; keep the fetch window on the same day.
+  const endBillingDate = formatTokyoDate(now);
+  const endYear = Number(endBillingDate.slice(0, 4));
+  const endMonth = Number(endBillingDate.slice(5, 7));
+  const startMonthIndex = endYear * 12 + (endMonth - 1) - monthsBack;
+  const startYear = Math.floor(startMonthIndex / 12);
+  const startMonth = (startMonthIndex % 12) + 1;
+  const startBillingDate = `${String(startYear).padStart(4, "0")}-${String(startMonth).padStart(2, "0")}-01`;
   return {
-    startBillingDate: toYmd(start),
-    endBillingDate: toYmd(end),
+    startBillingDate,
+    endBillingDate,
   };
 }
 
