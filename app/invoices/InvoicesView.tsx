@@ -80,9 +80,7 @@ export function InvoicesView({
                       setRefreshError(
                         result.message ?? "再取得に失敗しました。",
                       );
-                      return;
-                    }
-                    if (result.status === "success") {
+                    } else if (result.status === "success") {
                       setRefreshMessage(result.message ?? null);
                     }
                     router.refresh();
