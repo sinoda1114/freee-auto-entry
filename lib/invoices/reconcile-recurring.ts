@@ -1,6 +1,6 @@
 import type { FreeeAuth } from "@/lib/freee/accounting";
 import {
-  getInvoices,
+  getInvoiceListPage,
   type InvoiceSummary,
 } from "@/lib/freee/invoice";
 import {
@@ -88,15 +88,15 @@ async function fetchInvoicesForPartners(
   for (let i = 0; i < partnerIds.length; i += 3) {
     const batch = partnerIds.slice(i, i + 3);
     for (let offset = 0; ; offset += 100) {
-      const page = await getInvoices(auth, {
+      const page = await getInvoiceListPage(auth, {
         offset,
         limit: 100,
         partnerIds: batch,
         startBillingDate,
         endBillingDate,
       });
-      collected.push(...page);
-      if (page.length < 100) {
+      collected.push(...page.invoices);
+      if (page.fetchedCount < 100) {
         break;
       }
     }

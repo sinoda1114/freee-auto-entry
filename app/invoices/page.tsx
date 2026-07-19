@@ -3,7 +3,7 @@ import { AuthGate } from "@/app/components/AuthGate";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
 import { appPageTitle } from "@/lib/app-brand";
-import { getInvoices } from "@/lib/freee/invoice";
+import { listInvoicesForUi } from "@/lib/freee/list-invoices-for-ui";
 import { getValidFreeeAuth } from "@/lib/freee/session-client";
 import { InvoicesView } from "./InvoicesView";
 
@@ -28,11 +28,18 @@ export default async function InvoicesPage({
     Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 
   let invoices;
+  let hasNext = false;
+  let unsentCount = 0;
+  let unsettledCount = 0;
   try {
-    invoices = await getInvoices(auth, {
-      offset: (page - 1) * PAGE_SIZE,
-      limit: PAGE_SIZE,
+    const listed = await listInvoicesForUi(auth, {
+      page,
+      pageSize: PAGE_SIZE,
     });
+    invoices = listed.invoices;
+    hasNext = listed.hasNext;
+    unsentCount = listed.unsentCount;
+    unsettledCount = listed.unsettledCount;
   } catch (error) {
     return (
       <PageShell width="md">
@@ -46,13 +53,6 @@ export default async function InvoicesPage({
     );
   }
 
-  const unsentCount = invoices.filter(
-    (invoice) => invoice.sendingStatus === "unsent",
-  ).length;
-  const unsettledCount = invoices.filter(
-    (invoice) => invoice.paymentStatus === "unsettled",
-  ).length;
-
   return (
     <InvoicesView
       companyId={auth.companyId}
@@ -60,7 +60,7 @@ export default async function InvoicesPage({
       page={page}
       unsentCount={unsentCount}
       unsettledCount={unsettledCount}
-      hasNext={invoices.length === PAGE_SIZE}
+      hasNext={hasNext}
     />
   );
 }

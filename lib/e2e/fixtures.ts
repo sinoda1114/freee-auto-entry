@@ -109,6 +109,20 @@ export const e2eWalletables: Walletable[] = [
 
 export const e2eInvoiceSummaries: InvoiceSummary[] = [
   {
+    id: 1001,
+    companyId: "11122591",
+    invoiceNumber: "2024100001",
+    subject: "古い請求（2024）",
+    billingDate: "2024-10-31",
+    sendingStatus: "sent",
+    paymentStatus: "unsettled",
+    dealStatus: "unregistered",
+    totalAmount: 1210000,
+    partnerId: 1,
+    partnerName: "旧取引先",
+    reportUrl: "https://invoice.freee.co.jp/download/1001",
+  },
+  {
     id: 2001,
     companyId: "11122591",
     invoiceNumber: "INV-2026-001",
@@ -121,5 +135,19 @@ export const e2eInvoiceSummaries: InvoiceSummary[] = [
     partnerId: 1,
     partnerName: "株式会社サンプル",
     reportUrl: "https://invoice.freee.co.jp/download/2001",
+  },
+  {
+    id: 2002,
+    companyId: "11122591",
+    invoiceNumber: "2026070023",
+    subject: "AWS運用保守 6月分",
+    billingDate: "2026-07-07",
+    sendingStatus: "sent",
+    paymentStatus: "unsettled",
+    dealStatus: "unregistered",
+    totalAmount: 22000,
+    partnerId: 55,
+    partnerName: "エヴァワット",
+    reportUrl: "https://invoice.freee.co.jp/download/2002",
   },
 ];

@@ -1,7 +1,7 @@
 import type { FreeeAuth } from "./accounting";
 import {
   generateInvoiceNumber,
-  isInvoiceNumberRequiredError,
+  isInvoiceNumberForbiddenError,
 } from "./invoice-number";
 
 const INVOICE_API_BASE = "https://api.freee.co.jp/iv";
@@ -80,14 +80,28 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function coerceString(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return undefined;
+}
+
 function parseInvoiceSummary(value: unknown): InvoiceSummary {
+  if (!isRecord(value)) {
+    throw new Error("freee invoice response is invalid");
+  }
+  const invoiceNumber = coerceString(value.invoice_number);
+  const subject = coerceString(value.subject);
   if (
-    !isRecord(value) ||
     typeof value.id !== "number" ||
     (typeof value.company_id !== "number" &&
       typeof value.company_id !== "string") ||
-    typeof value.invoice_number !== "string" ||
-    typeof value.subject !== "string" ||
+    invoiceNumber === undefined ||
+    subject === undefined ||
     typeof value.billing_date !== "string" ||
     (value.sending_status !== "sent" && value.sending_status !== "unsent") ||
     (value.payment_status !== "settled" &&
@@ -111,8 +125,8 @@ function parseInvoiceSummary(value: unknown): InvoiceSummary {
   return {
     id: value.id,
     companyId: String(value.company_id),
-    invoiceNumber: value.invoice_number,
-    subject: value.subject,
+    invoiceNumber,
+    subject,
     billingDate: value.billing_date,
     paymentDate: optionalString(value.payment_date),
     sendingStatus: value.sending_status,
@@ -130,6 +144,20 @@ function parseInvoiceSummary(value: unknown): InvoiceSummary {
     downloadedStatus,
     reportUrl: value.report_url,
   };
+}
+
+function tryParseInvoiceSummary(value: unknown): InvoiceSummary | null {
+  try {
+    return parseInvoiceSummary(value);
+  } catch (error) {
+    const id =
+      isRecord(value) && value.id !== undefined ? String(value.id) : "unknown";
+    console.error("[freee] skipped unparsable invoice", {
+      id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
 }
 
 export async function createInvoice(
@@ -195,24 +223,29 @@ export async function createInvoice(
   return { id: data.invoice.id, reportUrl: data.invoice.report_url };
 }
 
-/** Create invoice; if auto-numbering is off, retry once with a generated number. */
+/**
+ * Create invoice with a number by default (auto-numbering OFF companies).
+ * If freee rejects a supplied number (auto-numbering ON), retry without it.
+ */
 export async function createInvoiceResilient(
   auth: FreeeAuth,
   input: CreateInvoiceInput,
 ): Promise<CreatedInvoice> {
+  const provided = input.invoiceNumber?.trim();
+  const invoiceNumber =
+    provided ||
+    generateInvoiceNumber({
+      billingDate: input.billingDate,
+      partnerId: input.partnerId,
+    });
+
   try {
-    return await createInvoice(auth, input);
+    return await createInvoice(auth, { ...input, invoiceNumber });
   } catch (error) {
-    if (input.invoiceNumber || !isInvoiceNumberRequiredError(error)) {
+    if (provided || !isInvoiceNumberForbiddenError(error)) {
       throw error;
     }
-    return createInvoice(auth, {
-      ...input,
-      invoiceNumber: generateInvoiceNumber({
-        billingDate: input.billingDate,
-        partnerId: input.partnerId,
-      }),
-    });
+    return createInvoice(auth, { ...input, invoiceNumber: undefined });
   }
 }
 
@@ -227,10 +260,16 @@ export type GetInvoicesFilters = {
   sendingStatus?: "sent" | "unsent";
 };
 
-export async function getInvoices(
+export type InvoiceListPage = {
+  invoices: InvoiceSummary[];
+  /** Raw row count from freee before soft-parse skips (for pagination). */
+  fetchedCount: number;
+};
+
+export async function getInvoiceListPage(
   auth: FreeeAuth,
   pagination: GetInvoicesFilters,
-): Promise<InvoiceSummary[]> {
+): Promise<InvoiceListPage> {
   const params = new URLSearchParams({
     company_id: auth.companyId,
     offset: String(pagination.offset),
@@ -268,7 +307,19 @@ export async function getInvoices(
   if (!isRecord(data) || !Array.isArray(data.invoices)) {
     throw new Error("freee invoices response is invalid");
   }
-  return data.invoices.map(parseInvoiceSummary);
+  const invoices = data.invoices.flatMap((row) => {
+    const parsed = tryParseInvoiceSummary(row);
+    return parsed ? [parsed] : [];
+  });
+  return { invoices, fetchedCount: data.invoices.length };
+}
+
+export async function getInvoices(
+  auth: FreeeAuth,
+  pagination: GetInvoicesFilters,
+): Promise<InvoiceSummary[]> {
+  const page = await getInvoiceListPage(auth, pagination);
+  return page.invoices;
 }
 
 export async function getUnsentInvoiceCount(
@@ -277,11 +328,11 @@ export async function getUnsentInvoiceCount(
 ): Promise<number> {
   let count = 0;
   for (let offset = 0; ; offset += pageSize) {
-    const invoices = await getInvoices(auth, { offset, limit: pageSize });
-    count += invoices.filter(
+    const page = await getInvoiceListPage(auth, { offset, limit: pageSize });
+    count += page.invoices.filter(
       (invoice) => invoice.sendingStatus === "unsent",
     ).length;
-    if (invoices.length < pageSize) {
+    if (page.fetchedCount < pageSize) {
       return count;
     }
   }

@@ -36,7 +36,8 @@ if (process.env.E2E_SKIP_WEBSERVER !== "1") {
       ...process.env,
       E2E_TEST_MODE: "1",
       E2E_BOOTSTRAP_TOKEN: bootstrapToken,
-      AUTH_SECRET: process.env.AUTH_SECRET ?? "e2e-test-auth-secret-32chars-min!!",
+      // Always override — a short AUTH_SECRET from .env.local breaks iron-session.
+      AUTH_SECRET: "e2e-test-auth-secret-32chars-min!!",
       NEXT_PUBLIC_SITE_URL: baseURL,
       FREEE_CLIENT_ID: "e2e-client-id",
       FREEE_CLIENT_SECRET: "e2e-client-secret",
