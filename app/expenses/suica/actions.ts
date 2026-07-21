@@ -126,7 +126,9 @@ export async function createSuicaExpensesAction(
 
   const indexes = selectedRaw
     .split(",")
-    .map((s) => Number(s.trim()))
+    .map((s) => s.trim())
+    .filter((s) => s !== "")
+    .map((s) => Number(s))
     .filter((n) => Number.isInteger(n) && n >= 0 && n < items.length);
 
   const selected =

@@ -11,13 +11,15 @@
 
 ## ビルド
 
+既定の接続先 URL は `gradle.properties` の `SITE_URL` で管理します（build スクリプトにはハードコードしません）。本番向けはそのままビルドできます:
+
 ```bash
 cd android-suica
 # Android Studio で Open、または:
-./gradlew :app:assembleDebug -PSITE_URL=https://freee-auto-entry.vercel.app
+./gradlew :app:assembleDebug
 ```
 
-ローカル Web（エミュレータからホスト）:
+ローカル Web（エミュレータからホスト）は `-PSITE_URL` で上書き:
 
 ```bash
 ./gradlew :app:assembleDebug -PSITE_URL=http://10.0.2.2:3000
