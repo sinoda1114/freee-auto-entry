@@ -81,10 +81,8 @@ export function resolveMasterName(
   if (byNorm) {
     return byNorm;
   }
-  const candidates = names.filter(
-    (name) =>
-      normalizeLabel(name).includes(normalized) ||
-      normalized.includes(normalizeLabel(name)),
+  const candidates = names.filter((name) =>
+    normalized.includes(normalizeLabel(name)),
   );
   if (candidates.length === 0) {
     return null;
