@@ -6,7 +6,7 @@ import {
   useState,
   useTransition,
 } from "react";
-import { Button } from "@heroui/react";
+import { Autocomplete, AutocompleteItem, Button } from "@heroui/react";
 import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
 import type { OcrResult } from "@/lib/ai/receipt-ocr";
 import {
@@ -25,6 +25,9 @@ function isImageFile(file: File): boolean {
   return file.type.startsWith("image/");
 }
 
+const fieldClassName =
+  "rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900";
+
 export function ExpenseForm({
   accountItems,
   taxCodes,
@@ -38,6 +41,7 @@ export function ExpenseForm({
 
   const [issueDate, setIssueDate] = useState(todayIsoDate());
   const [accountItemId, setAccountItemId] = useState("");
+  const [accountInputValue, setAccountInputValue] = useState("");
   const [taxCode, setTaxCode] = useState("");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
@@ -71,6 +75,7 @@ export function ExpenseForm({
     });
     setIssueDate(todayIsoDate());
     setAccountItemId("");
+    setAccountInputValue("");
     setTaxCode("");
     setAmount("");
     setDescription("");
@@ -85,6 +90,7 @@ export function ExpenseForm({
   function handleAccountItemChange(value: string) {
     setAccountItemId(value);
     const item = accountItems.find((i) => String(i.id) === value);
+    setAccountInputValue(item?.name ?? "");
     if (item) {
       const defaultTax = taxCodes.find((t) => t.code === item.defaultTaxCode);
       if (defaultTax) {
@@ -116,6 +122,7 @@ export function ExpenseForm({
 
     if (matchedAccount) {
       setAccountItemId(String(matchedAccount.id));
+      setAccountInputValue(matchedAccount.name);
       filled.push("勘定科目");
     }
 
@@ -328,25 +335,44 @@ export function ExpenseForm({
         />
       </label>
 
-      <label className="flex flex-col gap-1">
-        <span className="text-sm text-zinc-600 dark:text-zinc-400">
-          勘定科目
-        </span>
-        <select
-          name="accountItemId"
-          value={accountItemId}
-          onChange={(e) => handleAccountItemChange(e.target.value)}
-          required
-          className="rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+      <div className="flex flex-col gap-1">
+        <input type="hidden" name="accountItemId" value={accountItemId} />
+        <Autocomplete
+          label="勘定科目"
+          aria-label="勘定科目"
+          placeholder="科目名で検索"
+          selectedKey={accountItemId || null}
+          inputValue={accountInputValue}
+          onInputChange={(value) => {
+            setAccountInputValue(value);
+            if (!value) {
+              setAccountItemId("");
+            }
+          }}
+          onSelectionChange={(key) => {
+            handleAccountItemChange(key?.toString() ?? "");
+          }}
+          isRequired
+          size="sm"
+          variant="bordered"
+          classNames={{
+            base: "text-sm",
+            listboxWrapper: "max-h-56",
+          }}
+          inputProps={{
+            classNames: {
+              inputWrapper:
+                "border-[var(--freee-border)] bg-[var(--freee-surface)]",
+            },
+          }}
         >
-          <option value="">選択してください</option>
           {accountItems.map((item) => (
-            <option key={item.id} value={item.id}>
+            <AutocompleteItem key={String(item.id)} textValue={item.name}>
               {item.name}
-            </option>
+            </AutocompleteItem>
           ))}
-        </select>
-      </label>
+        </Autocomplete>
+      </div>
 
       <label className="flex flex-col gap-1">
         <span className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -357,7 +383,7 @@ export function ExpenseForm({
           value={taxCode}
           onChange={(e) => setTaxCode(e.target.value)}
           required
-          className="rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+          className={fieldClassName}
         >
           <option value="">選択してください</option>
           {taxCodes.map((tax) => (
