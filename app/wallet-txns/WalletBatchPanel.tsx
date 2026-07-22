@@ -10,6 +10,7 @@ import {
   ModalHeader,
 } from "@heroui/react";
 import { useActionState, useMemo, useState } from "react";
+import { ProcessingStatus } from "@/app/components/ProcessingStatus";
 import { batchLlmRulesToDrafts } from "@/lib/ai/matcher-batch-llm-suggestion";
 import { MATCHER_CONDITION_LABELS } from "@/lib/freee/matcher-labels";
 import {
@@ -211,6 +212,9 @@ export function WalletBatchPanel({
 
                   {aiTargetItems.length > 0 ? (
                     <div className="space-y-2">
+                      {aiPending ? (
+                        <ProcessingStatus label="一括のルール候補をAIが提案中…" />
+                      ) : null}
                       <form action={aiFormAction} id="batch-ai-form">
                         <input type="hidden" name="companyId" value={companyId} />
                         <input
