@@ -44,6 +44,7 @@ export function ExpenseForm({
   const [receiptId, setReceiptId] = useState<number | null>(null);
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrDone, setOcrDone] = useState(false);
+  const [ocrFilledLabels, setOcrFilledLabels] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [lastSuccessDealId, setLastSuccessDealId] = useState<number | null>(
@@ -76,6 +77,7 @@ export function ExpenseForm({
     setReceiptId(null);
     setOcrError(null);
     setOcrDone(false);
+    setOcrFilledLabels([]);
     if (cameraInputRef.current) cameraInputRef.current.value = "";
     if (galleryInputRef.current) galleryInputRef.current.value = "";
   }
@@ -92,25 +94,55 @@ export function ExpenseForm({
   }
 
   function applyOcrResult(ocr: OcrResult) {
-    if (ocr.issueDate) setIssueDate(ocr.issueDate);
-    if (ocr.amount) setAmount(String(ocr.amount));
-    if (ocr.description) setDescription(ocr.description);
-    if (ocr.accountItemName) {
-      const matched = accountItems.find((i) => i.name === ocr.accountItemName);
-      if (matched) {
-        setAccountItemId(String(matched.id));
-        const defaultTax = taxCodes.find(
-          (t) => t.code === matched.defaultTaxCode,
-        );
-        if (defaultTax) setTaxCode(String(defaultTax.code));
-      }
+    const filled: string[] = [];
+
+    if (ocr.issueDate) {
+      setIssueDate(ocr.issueDate);
+      filled.push("発生日");
     }
+    if (ocr.amount) {
+      setAmount(String(ocr.amount));
+      filled.push("金額");
+    }
+    if (ocr.description) {
+      setDescription(ocr.description);
+      filled.push("摘要");
+    }
+
+    const matchedAccount =
+      ocr.accountItemName != null
+        ? accountItems.find((item) => item.name === ocr.accountItemName)
+        : undefined;
+
+    if (matchedAccount) {
+      setAccountItemId(String(matchedAccount.id));
+      filled.push("勘定科目");
+    }
+
+    let nextTax =
+      ocr.taxName != null
+        ? taxCodes.find((tax) => tax.name === ocr.taxName)
+        : undefined;
+
+    if (!nextTax && matchedAccount) {
+      nextTax = taxCodes.find(
+        (tax) => tax.code === matchedAccount.defaultTaxCode,
+      );
+    }
+
+    if (nextTax) {
+      setTaxCode(String(nextTax.code));
+      filled.push("税区分");
+    }
+
+    setOcrFilledLabels(filled);
   }
 
   function runOcr(file: File) {
     const requestId = ++ocrRequestIdRef.current;
     setOcrError(null);
     setOcrDone(false);
+    setOcrFilledLabels([]);
     setReceiptId(null);
 
     startOcrTransition(async () => {
@@ -252,18 +284,22 @@ export function ExpenseForm({
             ) : null}
 
             {ocrDone && !ocrError ? (
-              <div className="flex flex-wrap items-center gap-3">
-                <p className="text-sm text-green-600 dark:text-green-400">
-                  読み取り完了。内容を確認してから登録してください。
-                </p>
-                <button
-                  type="button"
-                  disabled={isOcrPending}
-                  onClick={handleRetryOcr}
-                  className="text-sm text-zinc-500 underline hover:text-zinc-700 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-200"
-                >
-                  再読み取り
-                </button>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-sm text-green-600 dark:text-green-400">
+                    {ocrFilledLabels.length > 0
+                      ? `読み取り完了。${ocrFilledLabels.join("・")}を入力しました。内容を確認してから登録してください。`
+                      : "読み取り完了。入力できる項目が見つかりませんでした。手動で入力してください。"}
+                  </p>
+                  <button
+                    type="button"
+                    disabled={isOcrPending}
+                    onClick={handleRetryOcr}
+                    className="text-sm text-zinc-500 underline hover:text-zinc-700 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  >
+                    再読み取り
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>
