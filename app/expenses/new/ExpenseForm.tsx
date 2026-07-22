@@ -6,9 +6,10 @@ import {
   useState,
   useTransition,
 } from "react";
-import { Autocomplete, AutocompleteItem, Button } from "@heroui/react";
+import { Autocomplete, AutocompleteItem, Button, Skeleton, Spinner } from "@heroui/react";
 import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
 import type { OcrResult } from "@/lib/ai/receipt-ocr";
+import { ProcessingStatus } from "@/app/components/ProcessingStatus";
 import {
   createExpenseAction,
   ocrReceiptAction,
@@ -237,6 +238,7 @@ export function ExpenseForm({
             size="sm"
             color="primary"
             isDisabled={isOcrPending}
+            isLoading={isOcrPending}
             onPress={() => cameraInputRef.current?.click()}
           >
             カメラで撮影
@@ -256,22 +258,41 @@ export function ExpenseForm({
         {selectedFile ? (
           <div className="flex flex-col gap-2">
             {previewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- blob preview URL
-              <img
-                src={previewUrl}
-                alt="選択した領収書のプレビュー"
-                className="max-h-48 w-auto rounded border border-zinc-200 object-contain dark:border-zinc-700"
-              />
+              <div className="relative inline-block max-w-full">
+                {/* eslint-disable-next-line @next/next/no-img-element -- blob preview URL */}
+                <img
+                  src={previewUrl}
+                  alt="選択した領収書のプレビュー"
+                  className={`max-h-48 w-auto rounded border border-zinc-200 object-contain dark:border-zinc-700 ${
+                    isOcrPending ? "opacity-50" : ""
+                  }`}
+                />
+                {isOcrPending ? (
+                  <div
+                    className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded bg-black/45 px-3 text-center"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <Spinner size="md" color="white" />
+                    <span className="text-sm font-medium text-white">
+                      領収書を読み取り中…
+                    </span>
+                  </div>
+                ) : null}
+              </div>
             ) : (
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                {selectedFile.name}
-              </p>
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  {selectedFile.name}
+                </p>
+                {isOcrPending ? (
+                  <ProcessingStatus label="領収書を読み取り中…" />
+                ) : null}
+              </div>
             )}
 
-            {isOcrPending ? (
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                読み取り中...
-              </p>
+            {isOcrPending && previewUrl ? (
+              <ProcessingStatus label="勘定科目・金額などを解析しています…" />
             ) : null}
 
             {ocrError ? (
@@ -321,6 +342,21 @@ export function ExpenseForm({
         ) : null}
       </div>
 
+      {isOcrPending ? (
+        <div
+          className="flex flex-col gap-3"
+          aria-busy="true"
+          aria-label="読み取り結果の入力欄を準備中"
+        >
+          <ProcessingStatus label="フォームへ反映する準備中…" />
+          <Skeleton className="h-10 w-full rounded-md" />
+          <Skeleton className="h-10 w-full rounded-md" />
+          <Skeleton className="h-10 w-3/4 rounded-md" />
+          <Skeleton className="h-10 w-1/2 rounded-md" />
+          <Skeleton className="h-10 w-full rounded-md" />
+        </div>
+      ) : (
+        <>
       <label className="flex flex-col gap-1">
         <span className="text-sm text-zinc-600 dark:text-zinc-400">
           発生日
@@ -430,8 +466,10 @@ export function ExpenseForm({
       >
         {isPending ? "登録中..." : "登録する"}
       </button>
+        </>
+      )}
 
-      {lastSuccessDealId ? (
+      {!isOcrPending && lastSuccessDealId ? (
         <div className="flex flex-col gap-2 rounded border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950/40">
           <p className="text-sm text-green-700 dark:text-green-300">
             登録しました（取引ID: {lastSuccessDealId}）。

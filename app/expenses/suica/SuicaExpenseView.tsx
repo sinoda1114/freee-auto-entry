@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Button, Checkbox } from "@heroui/react";
 import NextLink from "next/link";
 import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
+import { ProcessingStatus } from "@/app/components/ProcessingStatus";
 import {
   isDateInRegistrableRange,
   type RegistrableDateRange,
@@ -300,9 +301,7 @@ export function SuicaExpenseView({
           onChange={(e) => void handleCsvFile(e.target.files?.[0])}
         />
         {isCheckingDupes ? (
-          <p className="text-xs text-[var(--freee-text-muted)]">
-            freee の既存取引と照合中…
-          </p>
+          <ProcessingStatus label="freee の既存取引と照合中…" />
         ) : null}
         {csvError ? (
           <p className="text-sm text-red-600" role="alert">

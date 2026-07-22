@@ -1,6 +1,7 @@
 "use client";
 
-import { Button, Spinner, Textarea } from "@heroui/react";
+import { Button, Textarea } from "@heroui/react";
+import { ProcessingStatus } from "@/app/components/ProcessingStatus";
 import NextLink from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -354,10 +355,7 @@ export function AiConsultationPanel({
         ))}
 
         {isPending ? (
-          <div className="flex items-center gap-2 text-sm text-[var(--freee-text-muted)]">
-            <Spinner size="sm" color="primary" />
-            調査中…
-          </div>
+          <ProcessingStatus label="調査中…" />
         ) : null}
 
         {error ? (

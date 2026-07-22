@@ -3,6 +3,7 @@
 import { Autocomplete, AutocompleteItem, Button, Tooltip } from "@heroui/react";
 import { motion, useReducedMotion } from "framer-motion";
 import { useActionState, useMemo, useState } from "react";
+import { ProcessingStatus } from "@/app/components/ProcessingStatus";
 import {
   resolveTaxNameForAccountItem,
   type AccountItem,
@@ -345,17 +346,22 @@ function MatcherRulePanelForm({
           </p>
         ) : null}
         {aiSuggestions.length === 0 ? (
-          <Button
-            type="button"
-            size="md"
-            color="primary"
-            variant="solid"
-            isLoading={llmPending}
-            onPress={handleLlmSuggest}
-            className="h-10 w-full bg-gradient-to-r from-[var(--freee-hero-from)] to-[var(--freee-hero-to)] font-semibold shadow-sm sm:w-auto sm:min-w-[220px]"
-          >
-            AIに提案してもらう
-          </Button>
+          <>
+            {llmPending ? (
+              <ProcessingStatus label="勘定科目の候補をAIが提案中…" />
+            ) : null}
+            <Button
+              type="button"
+              size="md"
+              color="primary"
+              variant="solid"
+              isLoading={llmPending}
+              onPress={handleLlmSuggest}
+              className="h-10 w-full bg-gradient-to-r from-[var(--freee-hero-from)] to-[var(--freee-hero-to)] font-semibold shadow-sm sm:w-auto sm:min-w-[220px]"
+            >
+              AIに提案してもらう
+            </Button>
+          </>
         ) : (
           <SuggestionCardList
             suggestions={aiSuggestions}
