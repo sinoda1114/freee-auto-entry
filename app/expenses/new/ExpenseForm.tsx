@@ -109,7 +109,7 @@ export function ExpenseForm({
       filled.push("摘要");
     }
 
-    let matchedAccount =
+    const matchedAccount =
       ocr.accountItemName != null
         ? accountItems.find((item) => item.name === ocr.accountItemName)
         : undefined;
