@@ -7,6 +7,7 @@ import {
 } from "@/lib/db/matcher-history";
 import { getDatabase } from "@/lib/db/turso";
 import { appPageTitle } from "@/lib/app-brand";
+import { getAccountItems, getTaxCodes } from "@/lib/freee/accounting";
 import { getValidFreeeAuth } from "@/lib/freee/session-client";
 import { getAllUserMatchers } from "@/lib/freee/wallet";
 import { RulesView } from "./RulesView";
@@ -49,5 +50,17 @@ export default async function WalletRulesPage() {
     history = [];
   }
 
-  return <RulesView matchers={matchers} history={history} />;
+  const [accountItems, taxCodes] = await Promise.all([
+    getAccountItems(auth),
+    getTaxCodes(auth),
+  ]);
+
+  return (
+    <RulesView
+      matchers={matchers}
+      history={history}
+      accountItems={accountItems}
+      taxCodes={taxCodes}
+    />
+  );
 }

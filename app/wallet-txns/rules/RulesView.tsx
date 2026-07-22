@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Chip, Input } from "@heroui/react";
+import { Autocomplete, AutocompleteItem, Button, Chip, Input } from "@heroui/react";
 import {
   Fragment,
   useActionState,
@@ -12,6 +12,11 @@ import {
 } from "react";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
+import {
+  resolveTaxNameForAccountItem,
+  type AccountItem,
+  type TaxCode,
+} from "@/lib/freee/accounting";
 import {
   matcherActLabel,
   matcherConditionLabel,
@@ -34,6 +39,8 @@ type ActiveFilter = "active" | "inactive" | "all";
 interface RulesViewProps {
   matchers: UserMatcher[];
   history?: MatcherHistoryEntry[];
+  accountItems: AccountItem[];
+  taxCodes: TaxCode[];
 }
 
 function ToggleActiveButton({
@@ -68,9 +75,13 @@ function ToggleActiveButton({
 
 function EditMatcherFields({
   matcher,
+  accountItems,
+  taxCodes,
   onClose,
 }: {
   matcher: UserMatcher;
+  accountItems: AccountItem[];
+  taxCodes: TaxCode[];
   onClose: () => void;
 }) {
   const initialState: MatcherUpdateState = { status: "idle" };
@@ -78,6 +89,10 @@ function EditMatcherFields({
     updateMatcherFieldsAction,
     initialState,
   );
+  const [accountItemName, setAccountItemName] = useState(
+    matcher.accountItemName ?? "",
+  );
+  const [taxName, setTaxName] = useState(matcher.taxName ?? "");
 
   useEffect(() => {
     if (state.status === "success") {
@@ -88,6 +103,8 @@ function EditMatcherFields({
   return (
     <form action={formAction} className="flex flex-wrap items-end gap-2">
       <input type="hidden" name="matcherId" value={matcher.id} />
+      <input type="hidden" name="accountItemName" value={accountItemName} />
+      <input type="hidden" name="taxName" value={taxName} />
       <Input
         size="sm"
         name="description"
@@ -97,24 +114,57 @@ function EditMatcherFields({
         className="min-w-[12rem] max-w-xs"
         isRequired
       />
-      <Input
+      <Autocomplete
         size="sm"
-        name="accountItemName"
         label="勘定科目"
+        aria-label="勘定科目"
         labelPlacement="outside"
-        defaultValue={matcher.accountItemName ?? ""}
-        className="min-w-[10rem] max-w-xs"
+        placeholder="科目名で検索"
+        selectedKey={accountItemName || null}
+        inputValue={accountItemName}
+        onInputChange={setAccountItemName}
+        onSelectionChange={(key) => {
+          const nextAccountItemName = key?.toString() ?? "";
+          setAccountItemName(nextAccountItemName);
+          const nextTaxName = resolveTaxNameForAccountItem(
+            nextAccountItemName,
+            accountItems,
+            taxCodes,
+          );
+          if (nextTaxName) {
+            setTaxName(nextTaxName);
+          }
+        }}
         isRequired
-      />
-      <Input
-        size="sm"
-        name="taxName"
-        label="税区分"
-        labelPlacement="outside"
-        defaultValue={matcher.taxName ?? ""}
+        variant="bordered"
         className="min-w-[10rem] max-w-xs"
-        isRequired
-      />
+        classNames={{
+          base: "text-sm",
+          listboxWrapper: "max-h-56",
+        }}
+      >
+        {accountItems.map((item) => (
+          <AutocompleteItem key={item.name} textValue={item.name}>
+            {item.name}
+          </AutocompleteItem>
+        ))}
+      </Autocomplete>
+      <label className="grid min-w-[10rem] max-w-xs gap-1 text-sm">
+        <span className="text-xs text-foreground-500">税区分</span>
+        <select
+          value={taxName}
+          onChange={(event) => setTaxName(event.target.value)}
+          required
+          className="h-8 rounded-md border border-[var(--freee-border)] bg-[var(--freee-surface)] px-2 text-sm"
+        >
+          <option value="">選択してください</option>
+          {taxCodes.map((tax) => (
+            <option key={tax.code} value={tax.name}>
+              {tax.name}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="flex items-end gap-2">
         <Button type="submit" size="sm" color="primary" isLoading={isPending}>
           保存
@@ -132,21 +182,35 @@ function EditMatcherFields({
 
 function EditMatcherRow({
   matcher,
+  accountItems,
+  taxCodes,
   onClose,
 }: {
   matcher: UserMatcher;
+  accountItems: AccountItem[];
+  taxCodes: TaxCode[];
   onClose: () => void;
 }) {
   return (
     <tr className="bg-default-50">
       <td colSpan={7} className="px-3 py-3">
-        <EditMatcherFields matcher={matcher} onClose={onClose} />
+        <EditMatcherFields
+          matcher={matcher}
+          accountItems={accountItems}
+          taxCodes={taxCodes}
+          onClose={onClose}
+        />
       </td>
     </tr>
   );
 }
 
-export function RulesView({ matchers, history = [] }: RulesViewProps) {
+export function RulesView({
+  matchers,
+  history = [],
+  accountItems,
+  taxCodes,
+}: RulesViewProps) {
   const [actFilter, setActFilter] = useState<ActFilter>("1");
   const [sideFilter, setSideFilter] = useState<SideFilter>("all");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("active");
@@ -355,6 +419,8 @@ export function RulesView({ matchers, history = [] }: RulesViewProps) {
                     <div className="mt-3 rounded-md bg-[var(--freee-bg)] p-2">
                       <EditMatcherFields
                         matcher={matcher}
+                        accountItems={accountItems}
+                        taxCodes={taxCodes}
                         onClose={() => setEditingId(null)}
                       />
                     </div>
@@ -437,6 +503,8 @@ export function RulesView({ matchers, history = [] }: RulesViewProps) {
                       {editingId === matcher.id && (
                         <EditMatcherRow
                           matcher={matcher}
+                          accountItems={accountItems}
+                          taxCodes={taxCodes}
                           onClose={() => setEditingId(null)}
                         />
                       )}
