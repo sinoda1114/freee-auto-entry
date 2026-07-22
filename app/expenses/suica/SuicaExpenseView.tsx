@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Button, Checkbox } from "@heroui/react";
+import { Autocomplete, AutocompleteItem, Button, Checkbox } from "@heroui/react";
 import NextLink from "next/link";
 import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
 import {
@@ -67,6 +67,12 @@ export function SuicaExpenseView({
   const [accountItemId, setAccountItemId] = useState(
     defaultAccountItemId != null ? String(defaultAccountItemId) : "",
   );
+  const [accountInputValue, setAccountInputValue] = useState(() => {
+    if (defaultAccountItemId == null) return "";
+    return (
+      accountItems.find((item) => item.id === defaultAccountItemId)?.name ?? ""
+    );
+  });
   const [taxCode, setTaxCode] = useState(
     defaultTaxCode != null ? String(defaultTaxCode) : "",
   );
@@ -142,6 +148,7 @@ export function SuicaExpenseView({
   function handleAccountChange(value: string) {
     setAccountItemId(value);
     const item = accountItems.find((a) => String(a.id) === value);
+    setAccountInputValue(item?.name ?? "");
     if (item) {
       const matched = taxCodes.find((t) => t.code === item.defaultTaxCode);
       if (matched) setTaxCode(String(matched.code));
@@ -409,23 +416,41 @@ export function SuicaExpenseView({
           </ul>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="mb-1 block text-[var(--freee-text-muted)]">
-                勘定科目
-              </span>
-              <select
-                className="w-full rounded-md border border-[var(--freee-border)] bg-[var(--freee-surface)] px-3 py-2"
-                value={accountItemId}
-                onChange={(e) => handleAccountChange(e.target.value)}
-              >
-                <option value="">選択してください</option>
-                {accountItems.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <Autocomplete
+              label="勘定科目"
+              aria-label="勘定科目"
+              placeholder="科目名で検索"
+              selectedKey={accountItemId || null}
+              inputValue={accountInputValue}
+              onInputChange={(value) => {
+                setAccountInputValue(value);
+                if (!value) {
+                  setAccountItemId("");
+                }
+              }}
+              onSelectionChange={(key) => {
+                handleAccountChange(key?.toString() ?? "");
+              }}
+              isRequired
+              size="sm"
+              variant="bordered"
+              classNames={{
+                base: "text-sm",
+                listboxWrapper: "max-h-56",
+              }}
+              inputProps={{
+                classNames: {
+                  inputWrapper:
+                    "border-[var(--freee-border)] bg-[var(--freee-surface)]",
+                },
+              }}
+            >
+              {accountItems.map((item) => (
+                <AutocompleteItem key={String(item.id)} textValue={item.name}>
+                  {item.name}
+                </AutocompleteItem>
+              ))}
+            </Autocomplete>
             <label className="block text-sm">
               <span className="mb-1 block text-[var(--freee-text-muted)]">
                 税区分
