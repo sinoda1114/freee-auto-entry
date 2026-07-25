@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
       dynamic: 30,
       static: 180,
     },
+    // 領収書写真の Server Action アップロード用（Vercel 上限は約 4.5MB）
+    serverActions: {
+      bodySizeLimit: "4mb",
+    },
   },
 };
 

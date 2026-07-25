@@ -10,6 +10,7 @@ import { Autocomplete, AutocompleteItem, Button, Skeleton, Spinner } from "@hero
 import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
 import type { OcrResult } from "@/lib/ai/receipt-ocr";
 import { ProcessingStatus } from "@/app/components/ProcessingStatus";
+import { prepareReceiptFileForUpload } from "@/lib/receipts/prepare-receipt-file";
 import {
   createExpenseAction,
   ocrReceiptAction,
@@ -154,20 +155,30 @@ export function ExpenseForm({
     setReceiptId(null);
 
     startOcrTransition(async () => {
-      const fd = new FormData();
-      fd.append("file", file);
-      const result = await ocrReceiptAction(fd);
+      try {
+        const uploadFile = await prepareReceiptFileForUpload(file);
+        const fd = new FormData();
+        fd.append("file", uploadFile);
+        const result = await ocrReceiptAction(fd);
 
-      if (requestId !== ocrRequestIdRef.current) return;
+        if (requestId !== ocrRequestIdRef.current) return;
 
-      if (result.status === "error") {
-        setOcrError(result.message ?? "OCR読み取りに失敗しました。");
-        return;
+        if (result.status === "error") {
+          setOcrError(result.message ?? "OCR読み取りに失敗しました。");
+          return;
+        }
+
+        if (result.receiptId) setReceiptId(result.receiptId);
+        if (result.ocrResult) applyOcrResult(result.ocrResult);
+        setOcrDone(true);
+      } catch (error) {
+        if (requestId !== ocrRequestIdRef.current) return;
+        const message =
+          error instanceof Error
+            ? error.message
+            : "OCR読み取りに失敗しました。ファイルサイズを小さくして再度お試しください。";
+        setOcrError(message);
       }
-
-      if (result.receiptId) setReceiptId(result.receiptId);
-      if (result.ocrResult) applyOcrResult(result.ocrResult);
-      setOcrDone(true);
     });
   }
 
@@ -333,7 +344,8 @@ export function ExpenseForm({
           </div>
         ) : (
           <p className="text-xs text-zinc-500 dark:text-zinc-500">
-            撮影または選択すると自動で読み取ります。
+            撮影または選択すると自動で読み取ります。大きな写真は自動で圧縮します（目安
+            3.5MB 以下）。
           </p>
         )}
 
