@@ -42,7 +42,7 @@
     "@vitejs/plugin-react": "6.0.3",
     "eslint": "^9",
     "eslint-config-next": "16.3.0-preview.6",
-    "jsdom": "29.1.1",
+    "jsdom": "30.0.0",
     "tailwindcss": "^4",
     "typescript": "7.0.2",
     "typescript-6-eslint": "npm:typescript@6.0.3",
