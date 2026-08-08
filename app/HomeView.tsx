@@ -193,9 +193,32 @@ export function HomeDashboard({
   );
 }
 
-export function HomeHero() {
+export function HomeHero({
+  authError,
+  siteOrigin,
+}: {
+  authError?: string | null;
+  siteOrigin?: string | null;
+}) {
+  const siteHint = siteOrigin ?? "正規のサイトURL";
+  const authErrorMessage =
+    authError === "state_mismatch"
+      ? `ログインに失敗しました。${siteHint} から再度「freeeと連携する」を押してください（別ドメインからの開始だと失敗します）。`
+      : authError === "oauth_config"
+        ? "OAuth設定に問題があります。管理者に連絡してください。"
+        : authError === "token_exchange"
+          ? "freeeとのトークン交換に失敗しました。しばらくしてから再度お試しください。"
+          : authError
+            ? "ログインに失敗しました。再度お試しください。"
+            : null;
+
   return (
     <section className="panel px-4 py-4">
+      {authErrorMessage ? (
+        <p role="alert" className="mb-3 text-sm text-danger">
+          {authErrorMessage}
+        </p>
+      ) : null}
       <p className="text-sm leading-relaxed text-[var(--freee-text-muted)]">
         未処理明細・定型請求・請求書送付を一画面から操作します。
       </p>
