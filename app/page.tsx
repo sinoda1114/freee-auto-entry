@@ -18,16 +18,18 @@ export default async function Home({
     activeCompanyId && isExpenseCompany(activeCompanyId),
   );
   const { authError } = await searchParams;
+  const siteOrigin = getCanonicalSiteOrigin();
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-5 sm:px-5">
       {authenticated ? (
-        <HomeDashboard canRegisterExpense={canRegisterExpense} />
-      ) : (
-        <HomeHero
+        <HomeDashboard
+          canRegisterExpense={canRegisterExpense}
           authError={authError}
-          siteOrigin={getCanonicalSiteOrigin()}
+          siteOrigin={siteOrigin}
         />
+      ) : (
+        <HomeHero authError={authError} siteOrigin={siteOrigin} />
       )}
     </div>
   );

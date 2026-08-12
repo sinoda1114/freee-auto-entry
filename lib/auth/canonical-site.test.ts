@@ -21,24 +21,25 @@ afterEach(() => {
 });
 
 describe("getCanonicalSiteOrigin", () => {
-  it("prefers NEXT_PUBLIC_SITE_URL", () => {
-    process.env.NEXT_PUBLIC_SITE_URL = "https://mykeiri.shinodev.com";
+  it("prefers FREEE_REDIRECT_URI over NEXT_PUBLIC_SITE_URL", () => {
+    process.env.NEXT_PUBLIC_SITE_URL = "https://freee-auto-entry.vercel.app";
     process.env.FREEE_REDIRECT_URI =
-      "https://other.example/api/auth/callback/freee";
+      "https://mykeiri.shinodev.com/api/auth/callback/freee";
     expect(getCanonicalSiteOrigin()).toBe("https://mykeiri.shinodev.com");
   });
 
-  it("falls back to FREEE_REDIRECT_URI origin", () => {
-    delete process.env.NEXT_PUBLIC_SITE_URL;
-    process.env.FREEE_REDIRECT_URI =
-      "https://mykeiri.shinodev.com/api/auth/callback/freee";
+  it("falls back to NEXT_PUBLIC_SITE_URL", () => {
+    delete process.env.FREEE_REDIRECT_URI;
+    process.env.NEXT_PUBLIC_SITE_URL = "https://mykeiri.shinodev.com";
     expect(getCanonicalSiteOrigin()).toBe("https://mykeiri.shinodev.com");
   });
 });
 
 describe("canonicalRedirectUrl", () => {
   it("returns null when host already matches", () => {
-    process.env.NEXT_PUBLIC_SITE_URL = "https://mykeiri.shinodev.com";
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+    process.env.FREEE_REDIRECT_URI =
+      "https://mykeiri.shinodev.com/api/auth/callback/freee";
     expect(
       canonicalRedirectUrl(
         new URL("https://mykeiri.shinodev.com/api/auth/login?returnTo=%2F"),
@@ -46,8 +47,10 @@ describe("canonicalRedirectUrl", () => {
     ).toBeNull();
   });
 
-  it("redirects vercel.app login to the custom domain", () => {
-    process.env.NEXT_PUBLIC_SITE_URL = "https://mykeiri.shinodev.com";
+  it("redirects vercel.app login to the callback host", () => {
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+    process.env.FREEE_REDIRECT_URI =
+      "https://mykeiri.shinodev.com/api/auth/callback/freee";
     expect(
       canonicalRedirectUrl(
         new URL(
@@ -57,5 +60,13 @@ describe("canonicalRedirectUrl", () => {
     ).toBe(
       "https://mykeiri.shinodev.com/api/auth/login?returnTo=%2Fexpenses%2Fnew",
     );
+  });
+
+  it("rejects protocol-relative pathnames", () => {
+    process.env.FREEE_REDIRECT_URI =
+      "https://mykeiri.shinodev.com/api/auth/callback/freee";
+    const crafted = new URL("https://freee-auto-entry.vercel.app/");
+    Object.defineProperty(crafted, "pathname", { value: "//evil.com" });
+    expect(canonicalRedirectUrl(crafted)).toBeNull();
   });
 });

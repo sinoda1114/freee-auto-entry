@@ -35,30 +35,35 @@ export async function GET(request: NextRequest) {
     return authErrorRedirect(request, "oauth_config");
   }
 
+  let token;
   try {
-    const token = await exchangeCodeForToken({
+    token = await exchangeCodeForToken({
       clientId: config.clientId,
       clientSecret: config.clientSecret,
       code,
       redirectUri: config.redirectUri,
     });
+  } catch {
+    return authErrorRedirect(request, "token_exchange");
+  }
 
-    let companyName = `事業所 ${token.company_id}`;
-    try {
-      const companies = await getCompanies(token.access_token);
-      const matched = companies.find(
-        (company) => String(company.id) === token.company_id,
-      );
-      if (matched) {
-        companyName = matched.displayName ?? matched.name;
-      }
-    } catch {
-      // 事業所名の取得に失敗しても認可自体は継続する(フォールバック名を使う)
+  let companyName = `事業所 ${token.company_id}`;
+  try {
+    const companies = await getCompanies(token.access_token);
+    const matched = companies.find(
+      (company) => String(company.id) === token.company_id,
+    );
+    if (matched) {
+      companyName = matched.displayName ?? matched.name;
     }
+  } catch {
+    // 事業所名の取得に失敗しても認可自体は継続する(フォールバック名を使う)
+  }
 
-    const returnTo = session.oauthReturnTo;
-    session.oauthReturnTo = undefined;
+  const returnTo = session.oauthReturnTo;
+  session.oauthReturnTo = undefined;
 
+  try {
     await saveCompanyConnection({
       companyId: token.company_id,
       companyName,
@@ -66,13 +71,13 @@ export async function GET(request: NextRequest) {
       refreshToken: token.refresh_token,
       expiresIn: token.expires_in,
     });
-
-    const destination =
-      returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
-        ? returnTo
-        : "/";
-    return NextResponse.redirect(new URL(destination, siteUrl));
   } catch {
-    return authErrorRedirect(request, "token_exchange");
+    return authErrorRedirect(request, "save_session");
   }
+
+  const destination =
+    returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
+      ? returnTo
+      : "/";
+  return NextResponse.redirect(new URL(destination, siteUrl));
 }
