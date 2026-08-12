@@ -1,38 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCanonicalSiteOrigin } from "@/lib/auth/canonical-site";
 import { getFreeeOAuthConfig } from "@/lib/freee/config";
 import { getCompanies } from "@/lib/freee/company";
 import { exchangeCodeForToken } from "@/lib/freee/oauth";
 import { saveCompanyConnection } from "@/lib/freee/session-client";
 import { getSession } from "@/lib/session";
 
+function authErrorRedirect(request: NextRequest, reason: string): NextResponse {
+  const siteUrl =
+    getCanonicalSiteOrigin() ??
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    request.nextUrl.origin;
+  const destination = new URL("/", siteUrl);
+  destination.searchParams.set("authError", reason);
+  return NextResponse.redirect(destination);
+}
+
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   const state = request.nextUrl.searchParams.get("state");
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? request.nextUrl.origin;
+  const siteUrl =
+    getCanonicalSiteOrigin() ??
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    request.nextUrl.origin;
 
   const session = await getSession();
 
   if (!code || !state || state !== session.oauthState) {
-    return NextResponse.json(
-      { error: "認可リクエストが不正です(stateの不一致、またはcode欠落)" },
-      { status: 400 },
-    );
+    return authErrorRedirect(request, "state_mismatch");
   }
 
   const config = getFreeeOAuthConfig();
   if (!config) {
-    return NextResponse.json(
-      { error: "freee OAuthの環境変数が未設定です" },
-      { status: 500 },
-    );
+    return authErrorRedirect(request, "oauth_config");
   }
 
-  const token = await exchangeCodeForToken({
-    clientId: config.clientId,
-    clientSecret: config.clientSecret,
-    code,
-    redirectUri: config.redirectUri,
-  });
+  let token;
+  try {
+    token = await exchangeCodeForToken({
+      clientId: config.clientId,
+      clientSecret: config.clientSecret,
+      code,
+      redirectUri: config.redirectUri,
+    });
+  } catch {
+    return authErrorRedirect(request, "token_exchange");
+  }
 
   let companyName = `事業所 ${token.company_id}`;
   try {
@@ -50,13 +63,17 @@ export async function GET(request: NextRequest) {
   const returnTo = session.oauthReturnTo;
   session.oauthReturnTo = undefined;
 
-  await saveCompanyConnection({
-    companyId: token.company_id,
-    companyName,
-    accessToken: token.access_token,
-    refreshToken: token.refresh_token,
-    expiresIn: token.expires_in,
-  });
+  try {
+    await saveCompanyConnection({
+      companyId: token.company_id,
+      companyName,
+      accessToken: token.access_token,
+      refreshToken: token.refresh_token,
+      expiresIn: token.expires_in,
+    });
+  } catch {
+    return authErrorRedirect(request, "save_session");
+  }
 
   const destination =
     returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")

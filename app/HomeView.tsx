@@ -139,17 +139,48 @@ function WorkflowGroup({
   );
 }
 
+function authErrorMessage(
+  authError: string | null | undefined,
+  siteOrigin?: string | null,
+): string | null {
+  if (!authError) return null;
+  const siteHint = siteOrigin ?? "正規のサイトURL";
+  if (authError === "state_mismatch") {
+    return `ログインに失敗しました。${siteHint} から再度「freeeと連携する」を押してください（別ドメインからの開始だと失敗します）。`;
+  }
+  if (authError === "oauth_config") {
+    return "OAuth設定に問題があります。管理者に連絡してください。";
+  }
+  if (authError === "token_exchange") {
+    return "freeeとのトークン交換に失敗しました。しばらくしてから再度お試しください。";
+  }
+  if (authError === "save_session") {
+    return "ログイン情報の保存に失敗しました。再度お試しください。";
+  }
+  return "ログインに失敗しました。再度お試しください。";
+}
+
 interface HomeDashboardProps {
   canRegisterExpense: boolean;
+  authError?: string | null;
+  siteOrigin?: string | null;
 }
 
 export function HomeDashboard({
   canRegisterExpense,
+  authError,
+  siteOrigin,
 }: HomeDashboardProps) {
   const accounting = buildAccountingWorkflows(canRegisterExpense);
+  const message = authErrorMessage(authError, siteOrigin);
 
   return (
     <>
+      {message ? (
+        <p role="alert" className="rounded-md bg-danger-50 px-3 py-2 text-sm text-danger">
+          {message}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-5">
         <WorkflowGroup title="経理" domain="accounting" items={accounting} />
         <WorkflowGroup title="請求" domain="billing" items={billingWorkflows} />
@@ -193,9 +224,22 @@ export function HomeDashboard({
   );
 }
 
-export function HomeHero() {
+export function HomeHero({
+  authError,
+  siteOrigin,
+}: {
+  authError?: string | null;
+  siteOrigin?: string | null;
+}) {
+  const message = authErrorMessage(authError, siteOrigin);
+
   return (
     <section className="panel px-4 py-4">
+      {message ? (
+        <p role="alert" className="mb-3 text-sm text-danger">
+          {message}
+        </p>
+      ) : null}
       <p className="text-sm leading-relaxed text-[var(--freee-text-muted)]">
         未処理明細・定型請求・請求書送付を一画面から操作します。
       </p>

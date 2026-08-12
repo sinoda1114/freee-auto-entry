@@ -1,11 +1,18 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { canonicalRedirectUrl } from "@/lib/auth/canonical-site";
 import { sanitizeReturnTo } from "@/lib/auth/return-to";
 import { getFreeeOAuthConfig } from "@/lib/freee/config";
 import { buildAuthorizeUrl } from "@/lib/freee/oauth";
 import { getSession } from "@/lib/session";
 
 export async function GET(request: NextRequest) {
+  // Cookie のドメインとコールバック URL を揃える（vercel.app → 正規ドメイン）
+  const hostRedirect = canonicalRedirectUrl(request.nextUrl);
+  if (hostRedirect) {
+    return NextResponse.redirect(hostRedirect);
+  }
+
   const config = getFreeeOAuthConfig();
   if (!config) {
     return NextResponse.json(
