@@ -13,7 +13,7 @@ export function useNotifyActionState(
     if (state === previous.current) return;
     previous.current = state;
 
-    if (state.status === "success") {
+    if (state.status === "success" || state.status === "done") {
       notifySuccess(successTitle, state.message);
     } else if (state.status === "error") {
       notifyError("失敗しました", state.message);
