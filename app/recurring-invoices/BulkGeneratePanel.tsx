@@ -4,6 +4,7 @@ import { Button, Checkbox, Chip } from "@heroui/react";
 import { useActionState, useState } from "react";
 import type { RecurringInvoiceTemplate } from "@/lib/db/recurring-invoices";
 import { formatTokyoDate, formatTokyoMonth } from "@/lib/date";
+import { useNotifyActionState } from "@/lib/ui/use-notify-action-state";
 import {
   bulkGenerateRecurringInvoicesAction,
   type BulkGenerateState,
@@ -39,6 +40,7 @@ export function BulkGeneratePanel({
     bulkGenerateRecurringInvoicesAction,
     initialState,
   );
+  useNotifyActionState(state, "一括作成が完了しました");
 
   if (activeTemplates.length === 0) return null;
 

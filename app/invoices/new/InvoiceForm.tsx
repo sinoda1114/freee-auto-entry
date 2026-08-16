@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { formatTokyoDate } from "@/lib/date";
 import type { Partner } from "@/lib/freee/accounting";
+import { useNotifyActionState } from "@/lib/ui/use-notify-action-state";
 import { createInvoiceAction, type InvoiceFormState } from "./actions";
 
 const initialState: InvoiceFormState = { status: "idle" };
@@ -18,6 +19,7 @@ export function InvoiceForm({
     createInvoiceAction,
     initialState,
   );
+  useNotifyActionState(state, "請求書を作成しました");
   const [lines, setLines] = useState([
     {
       key: crypto.randomUUID(),
@@ -30,6 +32,25 @@ export function InvoiceForm({
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
+      {state.status === "success" && (
+        <div
+          role="status"
+          className="rounded border border-green-600 p-4 text-green-700 dark:border-green-400 dark:text-green-400"
+        >
+          <p>請求書を作成しました（請求書ID: {state.invoiceId}）。</p>
+          <p className="mt-2">
+            送付はfreee側の画面から手動で行ってください。
+            <a
+              className="ml-2 underline"
+              href={state.reportUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              freeeで確認・送付する
+            </a>
+          </p>
+        </div>
+      )}
       <input type="hidden" name="companyId" value={companyId} />
       <label className="flex flex-col gap-1">
         <span className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -237,25 +258,6 @@ export function InvoiceForm({
         {isPending ? "作成中..." : "作成する"}
       </button>
 
-      {state.status === "success" && (
-        <div
-          role="status"
-          className="rounded border border-green-600 p-4 text-green-700 dark:border-green-400 dark:text-green-400"
-        >
-          <p>請求書を作成しました（請求書ID: {state.invoiceId}）。</p>
-          <p className="mt-2">
-            送付はfreee側の画面から手動で行ってください。
-            <a
-              className="ml-2 underline"
-              href={state.reportUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              freeeで確認・送付する
-            </a>
-          </p>
-        </div>
-      )}
       {state.status === "error" && (
         <p role="alert" className="text-red-600 dark:text-red-400">
           {state.message}

@@ -14,6 +14,7 @@ import {
   suggestMatcherFields,
 } from "@/lib/freee/matcher-suggestion";
 import type { CreateMatcherCondition, UserMatcher, WalletTransaction } from "@/lib/freee/wallet";
+import { useNotifyActionState } from "@/lib/ui/use-notify-action-state";
 import { createMatcherAction, type MatcherActionState } from "./actions";
 import { requestLlmMatcherSuggestionAction } from "./llm-suggestion-action";
 
@@ -218,6 +219,7 @@ function MatcherRulePanelForm({
     createMatcherAction,
     initialState,
   );
+  useNotifyActionState(state, "自動登録ルールを作成しました");
   const suggestion = useMemo(
     () =>
       suggestMatcherFields(

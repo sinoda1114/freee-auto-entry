@@ -9,6 +9,7 @@ import type {
 import { formatTokyoDate, formatTokyoMonth } from "@/lib/date";
 import type { InvoiceDetail } from "@/lib/freee/invoice";
 import { computeInvoiceDiff } from "@/lib/freee/invoice-diff";
+import { useNotifyActionState } from "@/lib/ui/use-notify-action-state";
 import {
   generateRecurringInvoiceAction,
   type GenerateInvoiceState,
@@ -112,6 +113,7 @@ export function GenerateInvoiceForm({
     generateRecurringInvoiceAction,
     initialState,
   );
+  useNotifyActionState(state, "請求書を作成しました");
   const [lines, setLines] = useState<InvoiceTemplateLine[]>(template.lines);
   const today = formatTokyoDate();
   const currentMonth = formatTokyoMonth();

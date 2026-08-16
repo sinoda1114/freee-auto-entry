@@ -8,6 +8,7 @@ import type {
 } from "@/lib/db/recurring-invoices";
 import type { Partner } from "@/lib/freee/accounting";
 import type { InvoiceDocumentTemplate } from "@/lib/freee/invoice";
+import { useNotifyActionState } from "@/lib/ui/use-notify-action-state";
 import { saveTemplateAction, type TemplateActionState } from "./actions";
 
 const initialState: TemplateActionState = { status: "idle" };
@@ -50,6 +51,7 @@ export function TemplateForm({
     saveTemplateAction,
     initialState,
   );
+  useNotifyActionState(state, template ? "定型請求を保存しました" : "定型請求を登録しました");
   const [lines, setLines] = useState<EditableLine[]>(
     (template?.lines ?? prefill?.lines)?.map((line) => ({
       ...line,
