@@ -18,6 +18,7 @@ import {
 } from "react";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
+import { useNotifyActionState } from "@/lib/ui/use-notify-action-state";
 import { RelatedSupportThreads } from "@/app/components/RelatedSupportThreads";
 import type { ConsultationTargetKind } from "@/lib/ai/consultation-target";
 import type {
@@ -249,6 +250,7 @@ function SupportNewForm({
     saveSupportThreadAction,
     saveInitial,
   );
+  useNotifyActionState(saveState, "問い合わせを保存しました");
   // 調査結果からの下書きは URL ではなく sessionStorage 経由で受け取る。
   // クライアント確定後の初回マウント時のみ取り出し、同時にストアから消す。
   const [initialDraft] = useState(() =>

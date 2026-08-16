@@ -5,6 +5,7 @@ import { Autocomplete, AutocompleteItem, Button, Checkbox } from "@heroui/react"
 import NextLink from "next/link";
 import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
 import { ProcessingStatus } from "@/app/components/ProcessingStatus";
+import { notifySuccess } from "@/lib/ui/notify";
 import {
   isDateInRegistrableRange,
   type RegistrableDateRange,
@@ -261,6 +262,10 @@ export function SuicaExpenseView({
           skippedDuplicateCount: skippedDuplicates,
           message: `${allDealIds.length}件の経費を登録しました。${skipNote}`,
         });
+        notifySuccess(
+          "Suica経費を登録しました",
+          `${allDealIds.length}件の経費を登録しました。${skipNote}`,
+        );
         setSelected(new Set());
         // 登録後は指紋が増えるので再照合
         const dupes = await refreshDuplicates(items, encodedItems);

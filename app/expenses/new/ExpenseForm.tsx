@@ -5,12 +5,15 @@ import {
   useRef,
   useState,
   useTransition,
+  type DragEvent,
 } from "react";
 import { Autocomplete, AutocompleteItem, Button, Skeleton, Spinner } from "@heroui/react";
 import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
 import type { OcrResult } from "@/lib/ai/receipt-ocr";
 import { ProcessingStatus } from "@/app/components/ProcessingStatus";
 import { prepareReceiptFileForUpload } from "@/lib/receipts/prepare-receipt-file";
+import { isImageFile, isReceiptDropFile } from "@/lib/receipts/receipt-file";
+import { notifyError, notifySuccess } from "@/lib/ui/notify";
 import {
   createExpenseAction,
   ocrReceiptAction,
@@ -21,10 +24,6 @@ const initialState: ExpenseFormState = { status: "idle" };
 
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function isImageFile(file: File): boolean {
-  return file.type.startsWith("image/");
 }
 
 const fieldClassName =
@@ -56,11 +55,14 @@ export function ExpenseForm({
   const [lastSuccessDealId, setLastSuccessDealId] = useState<number | null>(
     null,
   );
+  const [isDragging, setIsDragging] = useState(false);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const ocrRequestIdRef = useRef(0);
   const selectedFileRef = useRef<File | null>(null);
+  const successRef = useRef<HTMLDivElement>(null);
+  const dragDepthRef = useRef(0);
 
   useEffect(() => {
     return () => {
@@ -194,6 +196,42 @@ export function ExpenseForm({
     runOcr(file);
   }
 
+  function handleDroppedFile(file: File | undefined) {
+    if (!file) return;
+    if (!isReceiptDropFile(file)) {
+      setOcrError("画像またはPDFをドロップしてください。");
+      notifyError("このファイルは使えません", "画像またはPDFをドロップしてください。");
+      return;
+    }
+    handleFileSelected(file);
+  }
+
+  function handleDragEnter(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDragging(true);
+  }
+
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) {
+      setIsDragging(false);
+    }
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragging(false);
+    handleDroppedFile(event.dataTransfer.files[0]);
+  }
+
   function handleRetryOcr() {
     const file = selectedFileRef.current;
     if (!file) {
@@ -209,14 +247,72 @@ export function ExpenseForm({
       setState(result);
       if (result.status === "success" && result.dealId) {
         setLastSuccessDealId(result.dealId);
+        notifySuccess(
+          "登録しました",
+          `取引ID: ${result.dealId}。続けて登録できます。`,
+        );
         resetFormFields();
+        requestAnimationFrame(() => {
+          successRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        });
+      } else if (result.status === "error") {
+        notifyError("登録できませんでした", result.message);
       }
     });
   }
 
   return (
     <form action={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 rounded border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
+      {lastSuccessDealId ? (
+        <div
+          ref={successRef}
+          role="status"
+          aria-live="polite"
+          className="flex flex-col gap-2 rounded border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950/40"
+        >
+          <p className="text-sm font-semibold text-green-700 dark:text-green-300">
+            登録しました（取引ID: {lastSuccessDealId}）。
+          </p>
+          <p className="text-xs text-green-700/80 dark:text-green-300/80">
+            続けて登録できます。フォームは空に戻しています。
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              color="primary"
+              onPress={() => cameraInputRef.current?.click()}
+            >
+              続けて登録（カメラ）
+            </Button>
+            <Button
+              as="a"
+              size="sm"
+              variant="bordered"
+              href={`https://secure.freee.co.jp/deals#deal_id=${lastSuccessDealId}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              freeeで確認
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      <div
+        className={`flex flex-col gap-3 rounded border border-dashed p-3 ${
+          isDragging
+            ? "border-[var(--freee-blue)] bg-[color-mix(in_srgb,var(--freee-blue)_12%,transparent)]"
+            : "border-zinc-300 dark:border-zinc-700"
+        }`}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
           領収書・証憑（任意）
         </span>
@@ -344,8 +440,9 @@ export function ExpenseForm({
           </div>
         ) : (
           <p className="text-xs text-zinc-500 dark:text-zinc-500">
-            撮影または選択すると自動で読み取ります。大きな写真は自動で圧縮します（目安
-            3.5MB 以下）。
+            {isDragging
+              ? "ここにドロップして読み取ります。"
+              : "撮影・選択、または写真をドラッグして読み取ります。大きな写真は自動で圧縮します（目安 3.5MB 以下）。"}
           </p>
         )}
 
@@ -481,33 +578,6 @@ export function ExpenseForm({
         </>
       )}
 
-      {!isOcrPending && lastSuccessDealId ? (
-        <div className="flex flex-col gap-2 rounded border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950/40">
-          <p className="text-sm text-green-700 dark:text-green-300">
-            登録しました（取引ID: {lastSuccessDealId}）。
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              color="primary"
-              onPress={() => cameraInputRef.current?.click()}
-            >
-              続けて登録（カメラ）
-            </Button>
-            <Button
-              as="a"
-              size="sm"
-              variant="bordered"
-              href={`https://secure.freee.co.jp/deals#deal_id=${lastSuccessDealId}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              freeeで確認
-            </Button>
-          </div>
-        </div>
-      ) : null}
       {state.status === "error" && (
         <p className="text-red-600 dark:text-red-400">{state.message}</p>
       )}

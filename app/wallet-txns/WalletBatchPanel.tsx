@@ -11,6 +11,7 @@ import {
 } from "@heroui/react";
 import { useActionState, useMemo, useState } from "react";
 import { ProcessingStatus } from "@/app/components/ProcessingStatus";
+import { useNotifyActionState } from "@/lib/ui/use-notify-action-state";
 import { batchLlmRulesToDrafts } from "@/lib/ai/matcher-batch-llm-suggestion";
 import { MATCHER_CONDITION_LABELS } from "@/lib/freee/matcher-labels";
 import {
@@ -101,6 +102,7 @@ export function WalletBatchPanel({
     bulkCreateMatcherRulesAction,
     initialBatchState,
   );
+  useNotifyActionState(batchState, "一括処理が完了しました");
   const [aiState, aiFormAction, aiPending] = useActionState(
     requestBatchLlmMatcherSuggestionAction,
     initialAiState,

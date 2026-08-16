@@ -12,6 +12,7 @@ import {
 } from "react";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
+import { useNotifyActionState } from "@/lib/ui/use-notify-action-state";
 import {
   resolveTaxNameForAccountItem,
   type AccountItem,
@@ -89,6 +90,7 @@ function EditMatcherFields({
     updateMatcherFieldsAction,
     initialState,
   );
+  useNotifyActionState(state, "ルールを保存しました");
   const [accountItemName, setAccountItemName] = useState(
     matcher.accountItemName ?? "",
   );

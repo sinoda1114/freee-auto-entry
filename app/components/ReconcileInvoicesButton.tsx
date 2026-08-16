@@ -7,6 +7,7 @@ import {
   reconcileRecurringInvoicesAction,
   type ReconcileRecurringState,
 } from "@/app/recurring-invoices/actions";
+import { useNotifyActionState } from "@/lib/ui/use-notify-action-state";
 
 const initialState: ReconcileRecurringState = { status: "idle" };
 
@@ -22,6 +23,7 @@ export function ReconcileInvoicesButton({
     reconcileRecurringInvoicesAction,
     initialState,
   );
+  useNotifyActionState(state, "突合が完了しました");
 
   useEffect(() => {
     if (state.status === "success") {

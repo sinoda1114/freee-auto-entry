@@ -1,6 +1,6 @@
 "use client";
 
-import { HeroUIProvider } from "@heroui/react";
+import { HeroUIProvider, ToastProvider } from "@heroui/react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { useRouter } from "next/navigation";
 
@@ -15,6 +15,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
     >
       <HeroUIProvider navigate={router.push} locale="ja-JP">
+        <ToastProvider placement="top-center" maxVisibleToasts={3} />
         {children}
       </HeroUIProvider>
     </NextThemesProvider>
