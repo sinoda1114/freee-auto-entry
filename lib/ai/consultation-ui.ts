@@ -69,6 +69,82 @@ export function saveConsultationFontSize(fontSize: number): void {
   }
 }
 
+const PANEL_SIZE_STORAGE_KEY = "freee-ai-consultation-panel-size";
+
+export const CONSULTATION_PANEL_WIDTH_MIN = 280;
+export const CONSULTATION_PANEL_HEIGHT_MIN = 240;
+export const CONSULTATION_PANEL_WIDTH_DEFAULT = 480;
+export const CONSULTATION_PANEL_HEIGHT_DEFAULT = 420;
+
+export type ConsultationPanelSize = {
+  width: number;
+  height: number;
+};
+
+export function clampConsultationPanelSize(
+  size: ConsultationPanelSize,
+  viewport?: { width: number; height: number },
+): ConsultationPanelSize {
+  const vw =
+    viewport?.width ??
+    (typeof window !== "undefined" ? window.innerWidth : 1280);
+  const vh =
+    viewport?.height ??
+    (typeof window !== "undefined" ? window.innerHeight : 800);
+  const maxWidth = Math.max(CONSULTATION_PANEL_WIDTH_MIN, vw - 32);
+  // FAB + margins (~5.5rem bottom + 1rem top)
+  const maxHeight = Math.max(CONSULTATION_PANEL_HEIGHT_MIN, vh - 104);
+
+  const width = Number.isFinite(size.width)
+    ? Math.min(maxWidth, Math.max(CONSULTATION_PANEL_WIDTH_MIN, Math.round(size.width)))
+    : CONSULTATION_PANEL_WIDTH_DEFAULT;
+  const height = Number.isFinite(size.height)
+    ? Math.min(
+        maxHeight,
+        Math.max(CONSULTATION_PANEL_HEIGHT_MIN, Math.round(size.height)),
+      )
+    : CONSULTATION_PANEL_HEIGHT_DEFAULT;
+
+  return { width, height };
+}
+
+export function loadConsultationPanelSize(): ConsultationPanelSize {
+  const fallback = {
+    width: CONSULTATION_PANEL_WIDTH_DEFAULT,
+    height: CONSULTATION_PANEL_HEIGHT_DEFAULT,
+  };
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+  try {
+    const raw = localStorage.getItem(PANEL_SIZE_STORAGE_KEY);
+    if (!raw) {
+      return clampConsultationPanelSize(fallback);
+    }
+    const parsed = JSON.parse(raw) as Partial<ConsultationPanelSize>;
+    return clampConsultationPanelSize({
+      width: Number(parsed.width),
+      height: Number(parsed.height),
+    });
+  } catch {
+    return clampConsultationPanelSize(fallback);
+  }
+}
+
+export function saveConsultationPanelSize(size: ConsultationPanelSize): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    localStorage.setItem(
+      PANEL_SIZE_STORAGE_KEY,
+      JSON.stringify(clampConsultationPanelSize(size)),
+    );
+  } catch {
+    // ignore quota errors
+  }
+}
+
 export function createConsultationMessageId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
