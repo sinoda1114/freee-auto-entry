@@ -32,6 +32,14 @@ describe("selectRecipes", () => {
     const recipes = selectRecipes("損益計算書を表示して", "");
     expect(recipes).toEqual([]);
   });
+
+  it("matches invoice-list for partner invoice listing", () => {
+    const recipes = selectRecipes(
+      "博報堂プロダクツの請求書をここ三ヶ月でリストアップして",
+      "",
+    );
+    expect(recipes.map((r) => r.id)).toEqual(["invoice-list"]);
+  });
 });
 
 describe("appendRecipesToSystem", () => {
