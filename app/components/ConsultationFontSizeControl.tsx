@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type WheelEvent } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   clampConsultationFontSize,
   CONSULTATION_FONT_SIZE_MAX,
@@ -9,7 +9,7 @@ import {
 
 interface ConsultationFontSizeControlProps {
   fontSize: number;
-  onFontSizeChange: (fontSize: number) => void;
+  onFontSizeChange: (fontSize: number | ((prev: number) => number)) => void;
   actionClassName: string;
 }
 
@@ -35,21 +35,39 @@ export function ConsultationFontSizeControl({
     return () => window.removeEventListener("pointerdown", handlePointerDown);
   }, [open]);
 
-  function nudgeFontSize(delta: number) {
-    onFontSizeChange(clampConsultationFontSize(fontSize + delta));
-  }
-
-  function handleWheel(event: WheelEvent) {
-    if (Math.abs(event.deltaY) < 1) {
+  useEffect(() => {
+    if (!open) {
       return;
     }
-    event.preventDefault();
-    event.stopPropagation();
-    nudgeFontSize(event.deltaY < 0 ? 1 : -1);
-  }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setOpen(false);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
+
+  useEffect(() => {
+    const element = rootRef.current;
+    if (!element) {
+      return;
+    }
+    function handleWheel(event: globalThis.WheelEvent) {
+      if (Math.abs(event.deltaY) < 1) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      onFontSizeChange((prev) => prev + (event.deltaY < 0 ? 1 : -1));
+    }
+    element.addEventListener("wheel", handleWheel, { passive: false });
+    return () => element.removeEventListener("wheel", handleWheel);
+  }, [onFontSizeChange]);
 
   return (
-    <div ref={rootRef} className="relative" onWheel={handleWheel}>
+    <div ref={rootRef} className="relative">
       <button
         type="button"
         className={actionClassName}
@@ -67,7 +85,6 @@ export function ConsultationFontSizeControl({
           role="group"
           aria-label="文字サイズ調整"
           className="absolute top-full right-0 z-20 mt-1 flex flex-col items-center gap-1 rounded-lg border border-[var(--freee-border)] bg-[var(--freee-surface)] px-2.5 py-2 shadow-lg"
-          onWheel={handleWheel}
         >
           <span className="text-[10px] font-semibold text-[var(--freee-text-muted)]">
             大

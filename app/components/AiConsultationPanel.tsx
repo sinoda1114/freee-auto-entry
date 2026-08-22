@@ -11,7 +11,6 @@ import {
   useState,
   useTransition,
   type RefObject,
-  type WheelEvent,
 } from "react";
 import { aiConsultationAction } from "@/app/ai-consultation-action";
 import { ConsultationReportView } from "@/app/components/ConsultationReportView";
@@ -233,6 +232,7 @@ export function AiConsultationPanel({
   } = useAiConsultationChat(companyId);
   const bottomRef = useRef<HTMLDivElement>(null);
   const questionRef = useRef<HTMLTextAreaElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const generatedId = useId();
   const resolvedPanelId = panelId ?? `ai-consultation-panel-${generatedId}`;
   const keyboardHintId = `${generatedId}-keyboard-hint`;
@@ -282,6 +282,28 @@ export function AiConsultationPanel({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, onViewModeChange, viewMode]);
 
+  useEffect(() => {
+    const element = panelRef.current;
+    if (!element) {
+      return;
+    }
+    function handlePanelWheel(event: globalThis.WheelEvent) {
+      // YouTube volume と同様: Ctrl/Cmd + ホイールで文字サイズ
+      if (!(event.ctrlKey || event.metaKey)) {
+        return;
+      }
+      if (Math.abs(event.deltaY) < 1) {
+        return;
+      }
+      event.preventDefault();
+      setFontSize((prev) =>
+        clampConsultationFontSize(prev + (event.deltaY < 0 ? 1 : -1)),
+      );
+    }
+    element.addEventListener("wheel", handlePanelWheel, { passive: false });
+    return () => element.removeEventListener("wheel", handlePanelWheel);
+  }, []);
+
   function openInNewTab() {
     saveConsultationState({ messages, targetHint, viewMode: "compact" });
     window.open("/ai-consultation", "_blank", "noopener,noreferrer");
@@ -291,20 +313,10 @@ export function AiConsultationPanel({
     onViewModeChange(viewMode === "fullscreen" ? "compact" : "fullscreen");
   }
 
-  function updateFontSize(next: number) {
-    setFontSize(clampConsultationFontSize(next));
-  }
-
-  function handlePanelWheel(event: WheelEvent<HTMLDivElement>) {
-    // YouTube volume と同様: Ctrl/Cmd + ホイールで文字サイズ
-    if (!(event.ctrlKey || event.metaKey)) {
-      return;
-    }
-    if (Math.abs(event.deltaY) < 1) {
-      return;
-    }
-    event.preventDefault();
-    updateFontSize(fontSize + (event.deltaY < 0 ? 1 : -1));
+  function updateFontSize(next: number | ((prev: number) => number)) {
+    setFontSize((prev) =>
+      clampConsultationFontSize(typeof next === "function" ? next(prev) : next),
+    );
   }
 
   const isFullscreen = viewMode === "fullscreen";
@@ -313,11 +325,11 @@ export function AiConsultationPanel({
 
   return (
     <div
+      ref={panelRef}
       id={resolvedPanelId}
       role="dialog"
       aria-label="AIに相談する"
       aria-modal={onClose ? true : undefined}
-      onWheel={handlePanelWheel}
       className={`flex h-full max-h-full flex-col overflow-hidden rounded-xl border border-[var(--freee-border)] bg-[var(--freee-surface)] shadow-2xl ${shellClassName}`}
     >
       <div className="flex items-center justify-between gap-2 border-b border-[var(--freee-border)] bg-gradient-to-r from-[var(--freee-hero-from)] to-[var(--freee-hero-to)] px-4 py-2 text-white">
