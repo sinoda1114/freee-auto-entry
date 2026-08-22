@@ -24,6 +24,50 @@ export interface ConsultationPersistedState {
 }
 
 const STORAGE_KEY = "freee-ai-consultation";
+const FONT_SIZE_STORAGE_KEY = "freee-ai-consultation-font-size";
+
+export const CONSULTATION_FONT_SIZE_MIN = 14;
+export const CONSULTATION_FONT_SIZE_MAX = 20;
+export const CONSULTATION_FONT_SIZE_DEFAULT = 16;
+
+export function clampConsultationFontSize(value: number): number {
+  if (!Number.isFinite(value)) {
+    return CONSULTATION_FONT_SIZE_DEFAULT;
+  }
+  return Math.min(
+    CONSULTATION_FONT_SIZE_MAX,
+    Math.max(CONSULTATION_FONT_SIZE_MIN, Math.round(value)),
+  );
+}
+
+export function loadConsultationFontSize(): number {
+  if (typeof window === "undefined") {
+    return CONSULTATION_FONT_SIZE_DEFAULT;
+  }
+  try {
+    const raw = localStorage.getItem(FONT_SIZE_STORAGE_KEY);
+    if (raw == null) {
+      return CONSULTATION_FONT_SIZE_DEFAULT;
+    }
+    return clampConsultationFontSize(Number(raw));
+  } catch {
+    return CONSULTATION_FONT_SIZE_DEFAULT;
+  }
+}
+
+export function saveConsultationFontSize(fontSize: number): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    localStorage.setItem(
+      FONT_SIZE_STORAGE_KEY,
+      String(clampConsultationFontSize(fontSize)),
+    );
+  } catch {
+    // ignore quota errors
+  }
+}
 
 export function createConsultationMessageId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {

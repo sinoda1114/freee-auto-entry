@@ -15,32 +15,32 @@ const LIKELIHOOD_CHIP_COLOR = {
 
 const markdownComponents = {
   h1: ({ children }: { children?: ReactNode }) => (
-    <h3 className="mt-3 text-base font-bold text-[var(--freee-text)] first:mt-0">
+    <h3 className="mt-3 text-[1.05em] font-bold text-[var(--freee-text)] first:mt-0">
       {children}
     </h3>
   ),
   h2: ({ children }: { children?: ReactNode }) => (
-    <h3 className="mt-3 text-base font-bold text-[var(--freee-text)] first:mt-0">
+    <h3 className="mt-3 text-[1.05em] font-bold text-[var(--freee-text)] first:mt-0">
       {children}
     </h3>
   ),
   h3: ({ children }: { children?: ReactNode }) => (
-    <h3 className="mt-3 text-sm font-bold tracking-wide text-[var(--freee-text)] first:mt-0 sm:text-base">
+    <h3 className="mt-3 text-[1em] font-bold tracking-wide text-[var(--freee-text)] first:mt-0">
       {children}
     </h3>
   ),
   p: ({ children }: { children?: ReactNode }) => (
-    <p className="my-2 text-base leading-7 text-[var(--freee-text)] first:mt-0 last:mb-0 sm:text-[1.05rem]">
+    <p className="my-2 text-[1em] leading-7 text-[var(--freee-text)] first:mt-0 last:mb-0">
       {children}
     </p>
   ),
   ul: ({ children }: { children?: ReactNode }) => (
-    <ul className="my-2 list-disc space-y-1.5 pl-5 text-base leading-7">
+    <ul className="my-2 list-disc space-y-1.5 pl-5 text-[1em] leading-7">
       {children}
     </ul>
   ),
   ol: ({ children }: { children?: ReactNode }) => (
-    <ol className="my-2 list-decimal space-y-1.5 pl-5 text-base leading-7">
+    <ol className="my-2 list-decimal space-y-1.5 pl-5 text-[1em] leading-7">
       {children}
     </ol>
   ),
@@ -52,7 +52,7 @@ const markdownComponents = {
   ),
   table: ({ children }: { children?: ReactNode }) => (
     <div className="my-3 overflow-x-auto rounded-md border border-[var(--freee-border)]">
-      <table className="w-full min-w-[16rem] border-collapse text-sm sm:text-base">
+      <table className="w-full min-w-[16rem] border-collapse text-[0.95em]">
         {children}
       </table>
     </div>
@@ -87,18 +87,18 @@ export function ConsultationReportView({
   const factsTitle = isPresent ? "主な数字" : "事実";
 
   return (
-    <div className="space-y-4 text-base leading-relaxed text-[var(--freee-text)]">
+    <div className="space-y-4 text-[1em] leading-relaxed text-[var(--freee-text)]">
       {targetLabel && !isPresent ? (
-        <p className="text-sm font-semibold text-[var(--freee-blue)]">
+        <p className="text-[0.95em] font-semibold text-[var(--freee-blue)]">
           調査対象: {targetLabel}
         </p>
       ) : null}
       {targetLabel && isPresent ? (
-        <p className="text-sm font-semibold text-[var(--freee-blue)]">
+        <p className="text-[0.95em] font-semibold text-[var(--freee-blue)]">
           {targetLabel}
         </p>
       ) : null}
-      <div className="text-base leading-7 text-[var(--freee-text)] sm:text-[1.05rem]">
+      <div className="text-[1em] leading-7 text-[var(--freee-text)]">
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
           {report.summary}
         </ReactMarkdown>
@@ -106,10 +106,10 @@ export function ConsultationReportView({
 
       {report.facts.length > 0 ? (
         <section className="rounded-md border border-[var(--freee-border)] border-l-[3px] border-l-[var(--freee-blue)] px-3 py-2.5">
-          <h3 className="text-sm font-bold tracking-wide text-[var(--freee-blue)]">
+          <h3 className="text-[0.95em] font-bold tracking-wide text-[var(--freee-blue)]">
             {factsTitle}
           </h3>
-          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-sm leading-7 text-[var(--freee-text-muted)] sm:text-base">
+          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-[1em] leading-7 text-[var(--freee-text-muted)]">
             {report.facts.map((fact) => (
               <li key={fact}>{fact}</li>
             ))}
@@ -119,7 +119,7 @@ export function ConsultationReportView({
 
       {!isPresent && report.hypotheses.length > 0 ? (
         <section className="space-y-2">
-          <h3 className="text-sm font-bold tracking-wide text-[var(--freee-text)]">
+          <h3 className="text-[0.95em] font-bold tracking-wide text-[var(--freee-text)]">
             仮説
           </h3>
           <div className="space-y-2.5">
@@ -133,15 +133,15 @@ export function ConsultationReportView({
                     size="sm"
                     variant="flat"
                     color={LIKELIHOOD_CHIP_COLOR[hypothesis.likelihood]}
-                    classNames={{ content: "text-[11px] font-semibold" }}
+                    classNames={{ content: "text-[0.7em] font-semibold" }}
                   >
                     確率 {formatLikelihood(hypothesis.likelihood)}
                   </Chip>
-                  <p className="text-sm font-semibold text-[var(--freee-text)]">
+                  <p className="text-[1em] font-semibold text-[var(--freee-text)]">
                     {hypothesis.title}
                   </p>
                 </div>
-                <p className="mt-1.5 text-sm leading-7 text-[var(--freee-text-muted)] sm:text-base">
+                <p className="mt-1.5 text-[1em] leading-7 text-[var(--freee-text-muted)]">
                   {hypothesis.reasoning}
                 </p>
               </div>
@@ -152,10 +152,10 @@ export function ConsultationReportView({
 
       {!isPresent && report.checkpoints.length > 0 ? (
         <section className="rounded-md border border-[var(--freee-border)] bg-[var(--freee-bg)] px-3 py-2.5">
-          <h3 className="text-sm font-bold tracking-wide text-[var(--freee-text)]">
+          <h3 className="text-[0.95em] font-bold tracking-wide text-[var(--freee-text)]">
             確認ポイント
           </h3>
-          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-sm leading-7 text-[var(--freee-text-muted)] sm:text-base">
+          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-[1em] leading-7 text-[var(--freee-text-muted)]">
             {report.checkpoints.map((item) => (
               <li key={item}>{item}</li>
             ))}
@@ -165,10 +165,10 @@ export function ConsultationReportView({
 
       {!isPresent && report.suggestions.length > 0 ? (
         <section className="rounded-md border border-[var(--freee-border)] border-l-[3px] border-l-[var(--freee-billing)] bg-[color-mix(in_srgb,var(--freee-billing)_8%,var(--freee-surface))] px-3 py-2.5">
-          <h3 className="text-sm font-bold tracking-wide text-[var(--freee-billing)]">
+          <h3 className="text-[0.95em] font-bold tracking-wide text-[var(--freee-billing)]">
             修正案
           </h3>
-          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-sm leading-7 text-[var(--freee-text-muted)] sm:text-base">
+          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-[1em] leading-7 text-[var(--freee-text-muted)]">
             {report.suggestions.map((item) => (
               <li key={item}>{item}</li>
             ))}
