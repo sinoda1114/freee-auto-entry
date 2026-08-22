@@ -37,16 +37,17 @@ export function AiConsultationWidget({
     startHeight: number;
     pointerId: number;
   } | null>(null);
+  const prevResizingRef = useRef(isResizing);
   const panelId = useId();
   const panelClass = CONSULTATION_PANEL_CLASS[viewMode];
   const isFullscreen = viewMode === "fullscreen";
 
   useEffect(() => {
-    if (!open || isFullscreen) {
-      return;
+    if (prevResizingRef.current && !isResizing && !isFullscreen) {
+      saveConsultationPanelSize(panelSize);
     }
-    saveConsultationPanelSize(panelSize);
-  }, [open, isFullscreen, panelSize]);
+    prevResizingRef.current = isResizing;
+  }, [isResizing, isFullscreen, panelSize]);
 
   useEffect(() => {
     function handleResize() {
@@ -128,7 +129,7 @@ export function AiConsultationWidget({
         <div
           data-testid="ai-consultation-shell"
           className={`fixed z-50 flex flex-col ${
-            isResizing ? "" : "transition-[width,height] duration-200 ease-out"
+            isResizing ? "" : "transition-all duration-200 ease-out"
           } ${isFullscreen ? panelClass.shell : "bottom-20 right-4"}`}
           style={shellStyle}
         >

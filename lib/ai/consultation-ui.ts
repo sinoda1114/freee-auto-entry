@@ -138,7 +138,7 @@ export function saveConsultationPanelSize(size: ConsultationPanelSize): void {
   try {
     localStorage.setItem(
       PANEL_SIZE_STORAGE_KEY,
-      JSON.stringify(clampConsultationPanelSize(size)),
+      JSON.stringify(size),
     );
   } catch {
     // ignore quota errors
