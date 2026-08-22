@@ -20,7 +20,7 @@ describe("AiConsultationPanel font size", () => {
     sessionStorage.clear();
   });
 
-  it("shows a horizontal font size slider", () => {
+  it("hides the font size slider until Aa is opened", async () => {
     render(
       <AiConsultationPanel
         companyId="11122591"
@@ -29,13 +29,19 @@ describe("AiConsultationPanel font size", () => {
       />,
     );
 
+    expect(screen.queryByRole("slider", { name: "文字サイズ" })).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /文字サイズ/ }),
+    );
+
     const slider = screen.getByRole("slider", { name: "文字サイズ" });
     expect(slider).toHaveAttribute("min", "14");
     expect(slider).toHaveAttribute("max", "20");
     expect(slider).toHaveValue(String(CONSULTATION_FONT_SIZE_DEFAULT));
   });
 
-  it("applies stored font size to the panel CSS variable", () => {
+  it("applies stored font size to chat content via inline style", () => {
     saveConsultationFontSize(18);
 
     const { container } = render(
@@ -46,16 +52,13 @@ describe("AiConsultationPanel font size", () => {
       />,
     );
 
-    const dialog = container.querySelector('[role="dialog"]');
-    expect(dialog).toHaveStyle({
-      "--ai-chat-font-size": "18px",
-    });
-    expect(screen.getByRole("slider", { name: "文字サイズ" })).toHaveValue(
-      "18",
+    const inputSection = container.querySelector(
+      '[role="dialog"] > div:last-child',
     );
+    expect(inputSection).toHaveStyle({ fontSize: "18px" });
   });
 
-  it("updates the CSS variable when the slider changes", () => {
+  it("updates font size when the vertical slider changes", () => {
     const { container } = render(
       <AiConsultationPanel
         companyId="11122591"
@@ -64,13 +67,35 @@ describe("AiConsultationPanel font size", () => {
       />,
     );
 
-    const slider = screen.getByRole("slider", { name: "文字サイズ" });
-    fireEvent.change(slider, { target: { value: "20" } });
-
-    const dialog = container.querySelector('[role="dialog"]');
-    expect(dialog).toHaveStyle({
-      "--ai-chat-font-size": "20px",
+    fireEvent.click(screen.getByRole("button", { name: /文字サイズ/ }));
+    fireEvent.change(screen.getByRole("slider", { name: "文字サイズ" }), {
+      target: { value: "20" },
     });
+
+    const inputSection = container.querySelector(
+      '[role="dialog"] > div:last-child',
+    );
+    expect(inputSection).toHaveStyle({ fontSize: "20px" });
     expect(localStorage.getItem("freee-ai-consultation-font-size")).toBe("20");
+  });
+
+  it("changes font size with wheel over the Aa control", () => {
+    const { container } = render(
+      <AiConsultationPanel
+        companyId="11122591"
+        viewMode="compact"
+        onViewModeChange={() => {}}
+      />,
+    );
+
+    const aa = screen.getByRole("button", { name: /文字サイズ/ });
+    fireEvent.wheel(aa, { deltaY: -100 });
+
+    const inputSection = container.querySelector(
+      '[role="dialog"] > div:last-child',
+    );
+    expect(inputSection).toHaveStyle({
+      fontSize: `${CONSULTATION_FONT_SIZE_DEFAULT + 1}px`,
+    });
   });
 });

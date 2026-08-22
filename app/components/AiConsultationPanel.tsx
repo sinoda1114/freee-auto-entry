@@ -11,15 +11,15 @@ import {
   useState,
   useTransition,
   type RefObject,
+  type WheelEvent,
 } from "react";
 import { aiConsultationAction } from "@/app/ai-consultation-action";
 import { ConsultationReportView } from "@/app/components/ConsultationReportView";
+import { ConsultationFontSizeControl } from "@/app/components/ConsultationFontSizeControl";
 import { RelatedSupportThreads } from "@/app/components/RelatedSupportThreads";
 import {
   clampConsultationFontSize,
   CONSULTATION_FONT_SIZE_DEFAULT,
-  CONSULTATION_FONT_SIZE_MAX,
-  CONSULTATION_FONT_SIZE_MIN,
   createConsultationMessageId,
   type ConsultationChatMessage,
   type ConsultationViewMode,
@@ -35,9 +35,7 @@ import { stashSupportDraft } from "@/lib/support/draft-handoff";
 const HEADER_ACTION_CLASS =
   "rounded-md px-2 py-1 text-xs font-semibold text-white/95 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--freee-blue-dark)] disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm";
 
-const CHAT_BODY_TEXT_CLASS = "text-[length:var(--ai-chat-font-size,1rem)]";
-const CHAT_INPUT_CLASS =
-  "text-[length:var(--ai-chat-font-size,1rem)] leading-relaxed";
+const CHAT_INPUT_CLASS = "text-[1em] leading-relaxed";
 
 export function useAiConsultationChat(companyId: string) {
   const pathname = usePathname();
@@ -181,10 +179,10 @@ function AssistantMessage({
           }))}
         />
       ) : null}
-      <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+      <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-[1em]">
         <NextLink
           href="/support"
-          className={`font-semibold text-[var(--freee-blue)] underline-offset-2 hover:underline ${CHAT_BODY_TEXT_CLASS}`}
+          className="font-semibold text-[var(--freee-blue)] underline-offset-2 hover:underline"
         >
           問い合わせ履歴へ
         </NextLink>
@@ -200,7 +198,7 @@ function AssistantMessage({
                 ].join("\n"),
               )
             }
-            className={`font-semibold text-[var(--freee-blue)] underline-offset-2 hover:underline ${CHAT_BODY_TEXT_CLASS}`}
+            className="font-semibold text-[var(--freee-blue)] underline-offset-2 hover:underline"
           >
             この内容でfreeeへの問い合わせ文を作る
           </NextLink>
@@ -238,7 +236,6 @@ export function AiConsultationPanel({
   const generatedId = useId();
   const resolvedPanelId = panelId ?? `ai-consultation-panel-${generatedId}`;
   const keyboardHintId = `${generatedId}-keyboard-hint`;
-  const fontSizeSliderId = `${generatedId}-font-size`;
   const [fontSize, setFontSize] = useState(() => {
     if (typeof window === "undefined") {
       return CONSULTATION_FONT_SIZE_DEFAULT;
@@ -294,15 +291,25 @@ export function AiConsultationPanel({
     onViewModeChange(viewMode === "fullscreen" ? "compact" : "fullscreen");
   }
 
-  function handleFontSizeChange(value: string) {
-    setFontSize(clampConsultationFontSize(Number(value)));
+  function updateFontSize(next: number) {
+    setFontSize(clampConsultationFontSize(next));
+  }
+
+  function handlePanelWheel(event: WheelEvent<HTMLDivElement>) {
+    // YouTube volume と同様: Ctrl/Cmd + ホイールで文字サイズ
+    if (!(event.ctrlKey || event.metaKey)) {
+      return;
+    }
+    if (Math.abs(event.deltaY) < 1) {
+      return;
+    }
+    event.preventDefault();
+    updateFontSize(fontSize + (event.deltaY < 0 ? 1 : -1));
   }
 
   const isFullscreen = viewMode === "fullscreen";
   const fullscreenToggleLabel = isFullscreen ? "戻す" : "全画面";
-  const panelStyle = {
-    ["--ai-chat-font-size" as string]: `${fontSize}px`,
-  };
+  const chatFontStyle = { fontSize: `${fontSize}px` };
 
   return (
     <div
@@ -310,7 +317,7 @@ export function AiConsultationPanel({
       role="dialog"
       aria-label="AIに相談する"
       aria-modal={onClose ? true : undefined}
-      style={panelStyle}
+      onWheel={handlePanelWheel}
       className={`flex h-full max-h-full flex-col overflow-hidden rounded-xl border border-[var(--freee-border)] bg-[var(--freee-surface)] shadow-2xl ${shellClassName}`}
     >
       <div className="flex items-center justify-between gap-2 border-b border-[var(--freee-border)] bg-gradient-to-r from-[var(--freee-hero-from)] to-[var(--freee-hero-to)] px-4 py-2 text-white">
@@ -318,6 +325,11 @@ export function AiConsultationPanel({
           <p className="text-sm font-bold sm:text-base">AIに相談する</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <ConsultationFontSizeControl
+            fontSize={fontSize}
+            onFontSizeChange={updateFontSize}
+            actionClassName={HEADER_ACTION_CLASS}
+          />
           <button
             type="button"
             className={HEADER_ACTION_CLASS}
@@ -364,48 +376,18 @@ export function AiConsultationPanel({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 border-b border-[var(--freee-border)] bg-[var(--freee-bg)] px-4 py-2">
-        <label
-          htmlFor={fontSizeSliderId}
-          className="shrink-0 text-xs font-semibold text-[var(--freee-text-muted)]"
-        >
-          文字サイズ
-        </label>
-        <span className="text-[11px] text-[var(--freee-text-muted)]" aria-hidden>
-          小
-        </span>
-        <input
-          id={fontSizeSliderId}
-          type="range"
-          min={CONSULTATION_FONT_SIZE_MIN}
-          max={CONSULTATION_FONT_SIZE_MAX}
-          step={1}
-          value={fontSize}
-          onChange={(event) => handleFontSizeChange(event.target.value)}
-          aria-valuetext={`${fontSize}ピクセル`}
-          className="h-2 min-w-0 flex-1 cursor-ew-resize accent-[var(--freee-blue)]"
-        />
-        <span className="text-[11px] text-[var(--freee-text-muted)]" aria-hidden>
-          大
-        </span>
-        <span className="w-8 shrink-0 text-right text-xs tabular-nums text-[var(--freee-text-muted)]">
-          {fontSize}
-        </span>
-      </div>
-
       <div
+        style={chatFontStyle}
         className={
           messages.length === 0 && !isPending && !error
             ? "max-h-0 min-h-0 overflow-hidden p-0"
-            : `space-y-4 overflow-y-auto px-4 py-4 ${CHAT_BODY_TEXT_CLASS} ${bodyClassName}`
+            : `space-y-4 overflow-y-auto px-4 py-4 ${bodyClassName}`
         }
       >
         {messages.map((message) => (
           <div key={message.id}>
             {message.role === "user" ? (
-              <div
-                className={`ml-4 rounded-lg bg-[color-mix(in_srgb,var(--freee-blue)_10%,var(--freee-surface))] px-3 py-2.5 leading-relaxed sm:ml-8 ${CHAT_BODY_TEXT_CLASS}`}
-              >
+              <div className="ml-4 rounded-lg bg-[color-mix(in_srgb,var(--freee-blue)_10%,var(--freee-surface))] px-3 py-2.5 text-[1em] leading-relaxed sm:ml-8">
                 {message.content}
               </div>
             ) : (
@@ -419,10 +401,7 @@ export function AiConsultationPanel({
         ) : null}
 
         {error ? (
-          <p
-            role="alert"
-            className={`text-danger ${CHAT_BODY_TEXT_CLASS}`}
-          >
+          <p role="alert" className="text-[1em] text-danger">
             {error}
           </p>
         ) : null}
@@ -431,6 +410,7 @@ export function AiConsultationPanel({
       </div>
 
       <div
+        style={chatFontStyle}
         className={`flex min-h-0 flex-col space-y-2.5 border-t border-[var(--freee-border)] px-4 py-3 ${
           messages.length === 0 && !isPending && !error ? "flex-1" : "shrink-0"
         }`}
@@ -494,7 +474,7 @@ export function AiConsultationPanel({
             id={keyboardHintId}
             className="hidden text-xs text-[var(--freee-text-muted)] sm:inline"
           >
-            Enter で送信 / Shift+Enter で改行
+            Enter で送信 / Shift+Enter で改行 / Ctrl+ホイールで文字サイズ
           </span>
           <Button
             size="md"
