@@ -52,4 +52,24 @@ describe("AiConsultationWidget panel resize", () => {
       screen.queryByRole("separator", { name: "幅を変更" }),
     ).not.toBeInTheDocument();
   });
+
+  it("reopens the FAB when a dock message arrives from popout", () => {
+    render(<AiConsultationWidget companyId="11122591" />);
+
+    expect(
+      screen.queryByRole("dialog", { name: "AIに相談する" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent(
+      window,
+      new MessageEvent("message", {
+        data: { type: "freee-ai-consultation-dock" },
+        origin: window.location.origin,
+      }),
+    );
+
+    expect(
+      screen.getByRole("dialog", { name: "AIに相談する" }),
+    ).toBeInTheDocument();
+  });
 });

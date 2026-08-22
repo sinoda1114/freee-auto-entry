@@ -126,4 +126,34 @@ describe("AiConsultationPanel font size", () => {
     );
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("docks back from popout to the opener FAB", () => {
+    const focus = vi.fn();
+    const close = vi.fn();
+    const postMessage = vi.fn();
+    vi.stubGlobal("close", close);
+    Object.defineProperty(window, "opener", {
+      configurable: true,
+      value: { closed: false, focus, postMessage },
+    });
+
+    render(
+      <AiConsultationPanel
+        companyId="11122591"
+        viewMode="expanded"
+        onViewModeChange={() => {}}
+        showOpenInNewTab={false}
+        showDockBack
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "本体のFABに戻す" }));
+
+    expect(postMessage).toHaveBeenCalledWith(
+      { type: "freee-ai-consultation-dock" },
+      window.location.origin,
+    );
+    expect(focus).toHaveBeenCalled();
+    expect(close).toHaveBeenCalled();
+  });
 });
