@@ -239,12 +239,11 @@ export function AiConsultationPanel({
   const resolvedPanelId = panelId ?? `ai-consultation-panel-${generatedId}`;
   const keyboardHintId = `${generatedId}-keyboard-hint`;
   const fontSizeSliderId = `${generatedId}-font-size`;
-  const [fontSize, setFontSize] = useState(() => {
-    if (typeof window === "undefined") {
-      return CONSULTATION_FONT_SIZE_DEFAULT;
-    }
-    return loadConsultationFontSize();
-  });
+  const [fontSize, setFontSize] = useState(() =>
+    typeof window === "undefined"
+      ? CONSULTATION_FONT_SIZE_DEFAULT
+      : loadConsultationFontSize(),
+  );
   const canSubmit = question.trim().length > 0 && !isPending;
 
   const canClear =
@@ -311,6 +310,7 @@ export function AiConsultationPanel({
       aria-label="AIに相談する"
       aria-modal={onClose ? true : undefined}
       style={panelStyle}
+      suppressHydrationWarning
       className={`flex h-full max-h-full flex-col overflow-hidden rounded-xl border border-[var(--freee-border)] bg-[var(--freee-surface)] shadow-2xl ${shellClassName}`}
     >
       <div className="flex items-center justify-between gap-2 border-b border-[var(--freee-border)] bg-gradient-to-r from-[var(--freee-hero-from)] to-[var(--freee-hero-to)] px-4 py-2 text-white">
@@ -383,12 +383,16 @@ export function AiConsultationPanel({
           value={fontSize}
           onChange={(event) => handleFontSizeChange(event.target.value)}
           aria-valuetext={`${fontSize}ピクセル`}
+          suppressHydrationWarning
           className="h-2 min-w-0 flex-1 cursor-ew-resize accent-[var(--freee-blue)]"
         />
         <span className="text-[11px] text-[var(--freee-text-muted)]" aria-hidden>
           大
         </span>
-        <span className="w-8 shrink-0 text-right text-xs tabular-nums text-[var(--freee-text-muted)]">
+        <span
+          className="w-8 shrink-0 text-right text-xs tabular-nums text-[var(--freee-text-muted)]"
+          suppressHydrationWarning
+        >
           {fontSize}
         </span>
       </div>

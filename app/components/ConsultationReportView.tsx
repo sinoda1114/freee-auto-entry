@@ -30,22 +30,22 @@ const markdownComponents = {
     </h3>
   ),
   p: ({ children }: { children?: ReactNode }) => (
-    <p className="my-2 text-[1em] leading-7 text-[var(--freee-text)] first:mt-0 last:mb-0">
+    <p className="my-2 text-[1em] leading-relaxed text-[var(--freee-text)] first:mt-0 last:mb-0">
       {children}
     </p>
   ),
   ul: ({ children }: { children?: ReactNode }) => (
-    <ul className="my-2 list-disc space-y-1.5 pl-5 text-[1em] leading-7">
+    <ul className="my-2 list-disc space-y-1.5 pl-5 text-[1em] leading-relaxed">
       {children}
     </ul>
   ),
   ol: ({ children }: { children?: ReactNode }) => (
-    <ol className="my-2 list-decimal space-y-1.5 pl-5 text-[1em] leading-7">
+    <ol className="my-2 list-decimal space-y-1.5 pl-5 text-[1em] leading-relaxed">
       {children}
     </ol>
   ),
   li: ({ children }: { children?: ReactNode }) => (
-    <li className="leading-7">{children}</li>
+    <li className="leading-relaxed">{children}</li>
   ),
   strong: ({ children }: { children?: ReactNode }) => (
     <strong className="font-semibold text-[var(--freee-text)]">{children}</strong>
@@ -87,7 +87,7 @@ export function ConsultationReportView({
   const factsTitle = isPresent ? "主な数字" : "事実";
 
   return (
-    <div className="space-y-4 text-[1em] leading-relaxed text-[var(--freee-text)]">
+    <div className="space-y-4 text-base text-[1em] leading-relaxed text-[var(--freee-text)]">
       {targetLabel && !isPresent ? (
         <p className="text-[0.95em] font-semibold text-[var(--freee-blue)]">
           調査対象: {targetLabel}
@@ -98,7 +98,7 @@ export function ConsultationReportView({
           {targetLabel}
         </p>
       ) : null}
-      <div className="text-[1em] leading-7 text-[var(--freee-text)]">
+      <div className="text-[1em] leading-relaxed text-[var(--freee-text)]">
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
           {report.summary}
         </ReactMarkdown>
@@ -109,7 +109,7 @@ export function ConsultationReportView({
           <h3 className="text-[0.95em] font-bold tracking-wide text-[var(--freee-blue)]">
             {factsTitle}
           </h3>
-          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-[1em] leading-7 text-[var(--freee-text-muted)]">
+          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-[1em] leading-relaxed text-[var(--freee-text-muted)]">
             {report.facts.map((fact) => (
               <li key={fact}>{fact}</li>
             ))}
@@ -141,7 +141,7 @@ export function ConsultationReportView({
                     {hypothesis.title}
                   </p>
                 </div>
-                <p className="mt-1.5 text-[1em] leading-7 text-[var(--freee-text-muted)]">
+                <p className="mt-1.5 text-[1em] leading-relaxed text-[var(--freee-text-muted)]">
                   {hypothesis.reasoning}
                 </p>
               </div>
@@ -155,7 +155,7 @@ export function ConsultationReportView({
           <h3 className="text-[0.95em] font-bold tracking-wide text-[var(--freee-text)]">
             確認ポイント
           </h3>
-          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-[1em] leading-7 text-[var(--freee-text-muted)]">
+          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-[1em] leading-relaxed text-[var(--freee-text-muted)]">
             {report.checkpoints.map((item) => (
               <li key={item}>{item}</li>
             ))}
@@ -168,7 +168,7 @@ export function ConsultationReportView({
           <h3 className="text-[0.95em] font-bold tracking-wide text-[var(--freee-billing)]">
             修正案
           </h3>
-          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-[1em] leading-7 text-[var(--freee-text-muted)]">
+          <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-[1em] leading-relaxed text-[var(--freee-text-muted)]">
             {report.suggestions.map((item) => (
               <li key={item}>{item}</li>
             ))}
