@@ -207,7 +207,7 @@ export function HomeDashboard({
             </Button>
           ) : (
             <p className="text-xs text-[var(--freee-text-muted)]">
-              経費はワールスフォース選択時のみ
+              経費は対応事業所選択時のみ
             </p>
           )}
           <Button

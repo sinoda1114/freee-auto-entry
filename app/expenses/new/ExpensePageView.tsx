@@ -68,9 +68,9 @@ export function ExpenseBlockedView({
       </Button>
       <PageHeader title="経費を登録" />
       <p className="mt-4 text-[var(--freee-text-muted)]">
-        経費登録は
-        {expenseCompanyName ? `「${expenseCompanyName}」` : "ワールスフォース"}
-        専用です。ヘッダーで事業所を切り替えてから再度お試しください。
+        経費登録は対応事業所のみ利用できます
+        {expenseCompanyName ? `（例: 「${expenseCompanyName}」）` : ""}
+        。ヘッダーで事業所を切り替えてから再度お試しください。
       </p>
     </PageShell>
   );
