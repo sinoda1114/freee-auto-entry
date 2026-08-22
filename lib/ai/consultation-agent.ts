@@ -2,10 +2,17 @@ import { generateText, stepCountIs, type ModelMessage } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { FreeeAuth } from "@/lib/freee/accounting";
 import type { AccountingConsultationReport } from "@/lib/ai/accounting-consultation";
+import {
+  extractInvoiceMonthsBack,
+  extractInvoiceSearchQuery,
+  formatInvoicesForConsultationPrompt,
+  listInvoicesForConsultation,
+} from "@/lib/ai/consultation-invoices";
 import { createConsultationTools } from "@/lib/ai/consultation-tools";
 import {
   appendRecipesToSystem,
   buildRecipeHistoryText,
+  isInvoiceListIntent,
   selectRecipes,
 } from "@/lib/ai/consultation-recipes";
 import { detectResponseMode } from "@/lib/ai/consultation-intent";
@@ -31,9 +38,9 @@ const CORE_SYSTEM_PROMPT = `あなたは freee 会計データの読み取り専
 動き方:
 - ツールで取れるデータは許可を取らずに自分で取る。毎ターン「よろしいですか？」と聞かない。
 - 「調べて」と言われたらすぐツールを呼び、取れた範囲で結論まで進める。
-- 請求書の一覧・取引先名での絞り込みは list_invoices を使う（例: 「博報堂プロダクツの請求書を3ヶ月分」）。
+- 請求書の一覧では【事前取得した請求書データ】を最優先し、足りないときだけ list_invoices を使う。口座明細・元帳へ切り替えない。
 - ユーザーに聞くのは、ツールでも会話履歴でも取れない前提だけ。
-- 数値・事実はツール結果に根拠がないなら出さない（捏造や根拠のない丸め推計をしない）。
+- 数値・事実はツール結果／事前取得データに根拠がないなら出さない（捏造や根拠のない丸め推計をしない）。
 - ツール結果と矛盾する言い訳をしない（取れた科目内訳があるのに「見えない」と言わない）。
 - 0件でも「権限不足」「アカウント権限ではできない」とは言わない。期間やキーワードを変えた再検索や、結果0件の事実を伝える。
 
@@ -67,7 +74,10 @@ export function buildConsultationSystemPrompt(
   return appendRecipesToSystem(CORE_SYSTEM_PROMPT, recipes);
 }
 
-function buildCurrentUserContent(input: RunConsultationAgentInput): string {
+function buildCurrentUserContent(
+  input: RunConsultationAgentInput,
+  invoicePrefetchText?: string | null,
+): string {
   const target =
     parseConsultationTarget(input.targetHint ?? "") ??
     parseConsultationTarget(input.question);
@@ -80,8 +90,48 @@ function buildCurrentUserContent(input: RunConsultationAgentInput): string {
       ? `パース済み対象: ${target.kind} #${target.id}`
       : "パース済み対象: なし",
     input.pagePath ? `アプリ画面: ${input.pagePath}` : null,
+    invoicePrefetchText?.trim() ? invoicePrefetchText.trim() : null,
   ];
   return lines.filter(Boolean).join("\n");
+}
+
+function resolveInvoiceSourceQuestion(
+  question: string,
+  history: ConsultationHistoryTurn[],
+): string {
+  if (/請求書|リストアップ|invoice/i.test(question)) {
+    return question;
+  }
+  const prior = [...history]
+    .reverse()
+    .find(
+      (turn) =>
+        turn.role === "user" &&
+        /請求書|リストアップ|invoice/i.test(turn.content),
+    );
+  return prior?.content ?? question;
+}
+
+async function prefetchInvoiceContext(
+  auth: FreeeAuth,
+  question: string,
+  history: ConsultationHistoryTurn[],
+): Promise<string | null> {
+  try {
+    const source = resolveInvoiceSourceQuestion(question, history);
+    const query = extractInvoiceSearchQuery(source);
+    const monthsBack = extractInvoiceMonthsBack(source);
+    const listed = await listInvoicesForConsultation(auth, {
+      query,
+      monthsBack,
+      limit: 30,
+    });
+    return formatInvoicesForConsultationPrompt(listed);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "請求書の取得に失敗しました";
+    return `【事前取得した請求書データ】\n取得エラー: ${message}\n権限不足とは断定せず、取得できなかった旨だけ伝えてください。`;
+  }
 }
 
 function toModelMessages(
@@ -182,9 +232,21 @@ export async function runConsultationAgent(
     history,
   });
   logConsultationModelRoute(route, input.question);
-  const tools = createConsultationTools(input.auth);
+  // ツール絞り込みは「今の質問」だけを見る。履歴に請求書があるだけで
+  // 損益など別話題を list_invoices 専用にしてしまわない。
+  const invoiceIntent = isInvoiceListIntent(input.question);
+  const allTools = createConsultationTools(input.auth);
+  const tools = invoiceIntent
+    ? { list_invoices: allTools.list_invoices }
+    : allTools;
+  const invoicePrefetch = invoiceIntent
+    ? await prefetchInvoiceContext(input.auth, input.question, history)
+    : null;
   const system = buildConsultationSystemPrompt(input.question, history);
-  const messages = toModelMessages(history, buildCurrentUserContent(input));
+  const messages = toModelMessages(
+    history,
+    buildCurrentUserContent(input, invoicePrefetch),
+  );
 
   try {
     const result = await generateText({
@@ -192,7 +254,7 @@ export async function runConsultationAgent(
       system,
       messages,
       tools,
-      stopWhen: stepCountIs(10),
+      stopWhen: stepCountIs(invoiceIntent ? 4 : 10),
       temperature: 0.2,
     });
 

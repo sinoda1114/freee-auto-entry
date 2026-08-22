@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { listInvoicesForConsultation } from "./consultation-invoices";
+import {
+  extractInvoiceMonthsBack,
+  extractInvoiceSearchQuery,
+  formatInvoicesForConsultationPrompt,
+  listInvoicesForConsultation,
+} from "./consultation-invoices";
 
 vi.mock("@/lib/freee/list-invoices-for-ui", () => ({
   listInvoicesForUi: vi.fn(),
@@ -8,6 +13,56 @@ vi.mock("@/lib/freee/list-invoices-for-ui", () => ({
 import { listInvoicesForUi } from "@/lib/freee/list-invoices-for-ui";
 
 const auth = { accessToken: "token", companyId: "11040830" };
+
+describe("extractInvoiceSearchQuery", () => {
+  it("takes the partner/subject before の請求書", () => {
+    expect(
+      extractInvoiceSearchQuery(
+        "博報堂プロダクツの請求書をここ三ヶ月でリストアップして",
+      ),
+    ).toBe("博報堂プロダクツ");
+  });
+});
+
+describe("extractInvoiceMonthsBack", () => {
+  it("reads 三ヶ月 as 3", () => {
+    expect(
+      extractInvoiceMonthsBack("請求書をここ三ヶ月でリストアップして"),
+    ).toBe(3);
+  });
+
+  it("reads numeric months", () => {
+    expect(extractInvoiceMonthsBack("直近6ヶ月の請求書")).toBe(6);
+  });
+});
+
+describe("formatInvoicesForConsultationPrompt", () => {
+  it("includes rows and forbids wallet/ledger diversion", () => {
+    const text = formatInvoicesForConsultationPrompt({
+      monthsBack: 3,
+      startBillingDate: "2026-05-01",
+      endBillingDate: "2026-08-22",
+      matchedCount: 1,
+      returnedCount: 1,
+      query: "博報堂プロダクツ",
+      invoices: [
+        {
+          id: 1,
+          invoiceNumber: "001",
+          partnerName: "株式会社Waalsforce",
+          subject: "博報堂プロダクツ 6月分",
+          billingDate: "2026-06-10",
+          totalAmount: 600000,
+          sendingStatus: "sent",
+          paymentStatus: "settled",
+        },
+      ],
+    });
+    expect(text).toContain("【事前取得した請求書データ】");
+    expect(text).toContain("博報堂プロダクツ 6月分");
+    expect(text).toContain("口座明細や総勘定元帳には切り替えない");
+  });
+});
 
 describe("listInvoicesForConsultation", () => {
   afterEach(() => {
@@ -82,6 +137,7 @@ describe("listInvoicesForConsultation", () => {
     });
     expect(result.matchedCount).toBe(1);
     expect(result.returnedCount).toBe(1);
+    expect(result.query).toBe("博報堂プロダクツ");
     expect(result.invoices[0]?.subject).toContain("博報堂プロダクツ");
   });
 
