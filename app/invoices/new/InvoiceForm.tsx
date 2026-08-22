@@ -112,7 +112,7 @@ export function InvoiceForm({
         <input
           type="text"
           name="invoiceNumber"
-          placeholder="自動採番オフ時は必須。空欄なら作成時に自動付与"
+          placeholder="空欄なら従来形式（例: 0062608）で自動付与"
           className="rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
         />
       </label>

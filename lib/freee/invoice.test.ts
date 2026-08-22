@@ -111,36 +111,68 @@ describe("createInvoice", () => {
     ).rejects.toThrow(/422/);
   });
 
-  it("sends a generated invoice_number on the first create attempt", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        invoice: {
-          id: 9,
-          report_url: "https://invoice.secure.freee.co.jp/reports/invoices/9",
-        },
-      }),
-    });
+  it("sends a traditional invoice_number inferred from recent invoices", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          invoices: [
+            {
+              id: 1,
+              company_id: 11040830,
+              invoice_number: "0062507",
+              subject: "博報堂プロダクツ 7月分 開発案件",
+              billing_date: "2026-07-21",
+              sending_status: "sent",
+              payment_status: "unsettled",
+              deal_status: "registered",
+              total_amount: 500000,
+              partner_id: 87428281,
+              partner_name: "株式会社Waalsforce",
+              report_url: "https://example.com/1",
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          invoice: {
+            id: 9,
+            report_url: "https://invoice.secure.freee.co.jp/reports/invoices/9",
+          },
+        }),
+      });
     vi.stubGlobal("fetch", fetchMock);
 
     const { createInvoiceResilient } = await import("./invoice");
     const result = await createInvoiceResilient(auth, {
-      billingDate: "2026-07-19",
-      partnerId: 55,
+      billingDate: "2026-08-22",
+      partnerId: 87428281,
+      subject: "博報堂プロダクツ 8月分 開発案件",
       lines: [
         { description: "月次", quantity: 1, unitPrice: 1000, taxRate: 10 },
       ],
     });
 
     expect(result.id).toBe(9);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string);
-    expect(body.invoice_number).toMatch(/^20260719-55-/);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const body = JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string);
+    expect(body.invoice_number).toBe("0062608");
   });
 
   it("retries without invoice_number when auto-numbering forbids a supplied number", async () => {
     const fetchMock = vi
       .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ invoices: [] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ invoices: [] }),
+      })
       .mockResolvedValueOnce({
         ok: false,
         status: 400,
@@ -176,8 +208,10 @@ describe("createInvoice", () => {
     });
 
     expect(result.id).toBe(10);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const secondBody = JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const createBody = JSON.parse(fetchMock.mock.calls[2]?.[1]?.body as string);
+    expect(createBody.invoice_number).toMatch(/^\d{7}/);
+    const secondBody = JSON.parse(fetchMock.mock.calls[3]?.[1]?.body as string);
     expect(secondBody.invoice_number).toBeUndefined();
   });
 });
