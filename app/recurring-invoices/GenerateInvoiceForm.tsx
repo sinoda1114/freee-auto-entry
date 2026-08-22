@@ -181,7 +181,7 @@ export function GenerateInvoiceForm({
           請求書番号（任意）
           <input
             name="invoiceNumber"
-            placeholder="空欄なら自動採番。無効時はこちらを入力または自動で付与します"
+            placeholder="空欄なら従来形式（例: 0062608）で自動付与"
             className="form-input"
           />
           <span className="mt-1 block text-xs text-[var(--freee-text-muted)]">

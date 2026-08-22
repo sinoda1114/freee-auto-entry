@@ -1,7 +1,9 @@
 import type { FreeeAuth } from "./accounting";
 import {
   generateInvoiceNumber,
+  inferInvoiceNumberPrefix,
   isInvoiceNumberForbiddenError,
+  type InvoiceNumberHint,
 } from "./invoice-number";
 
 const INVOICE_API_BASE = "https://api.freee.co.jp/iv";
@@ -224,7 +226,7 @@ export async function createInvoice(
 }
 
 /**
- * Create invoice with a number by default (auto-numbering OFF companies).
+ * Create invoice with a traditional-style number by default (auto-numbering OFF).
  * If freee rejects a supplied number (auto-numbering ON), retry without it.
  */
 export async function createInvoiceResilient(
@@ -232,12 +234,45 @@ export async function createInvoiceResilient(
   input: CreateInvoiceInput,
 ): Promise<CreatedInvoice> {
   const provided = input.invoiceNumber?.trim();
-  const invoiceNumber =
-    provided ||
-    generateInvoiceNumber({
+  let invoiceNumber = provided;
+  if (!invoiceNumber) {
+    const toHints = (invoices: InvoiceSummary[]): InvoiceNumberHint[] =>
+      invoices.map((invoice) => ({
+        partnerId: invoice.partnerId,
+        subject: invoice.subject,
+        invoiceNumber: invoice.invoiceNumber,
+        billingDate: invoice.billingDate,
+      }));
+
+    const partnerInvoices = await getInvoices(auth, {
+      offset: 0,
+      limit: 100,
+      partnerIds: [input.partnerId],
+    }).catch(() => [] as InvoiceSummary[]);
+    let hints = toHints(partnerInvoices);
+
+    if (
+      !inferInvoiceNumberPrefix({
+        partnerId: input.partnerId,
+        subject: input.subject,
+        hints,
+      })
+    ) {
+      const companyInvoices = await getInvoices(auth, {
+        offset: 0,
+        limit: 100,
+      }).catch(() => partnerInvoices);
+      hints = toHints(companyInvoices);
+    }
+
+    invoiceNumber = generateInvoiceNumber({
       billingDate: input.billingDate,
       partnerId: input.partnerId,
+      subject: input.subject,
+      existingNumbers: hints.map((hint) => hint.invoiceNumber),
+      hints,
     });
+  }
 
   try {
     return await createInvoice(auth, { ...input, invoiceNumber });
