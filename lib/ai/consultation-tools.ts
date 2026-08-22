@@ -20,6 +20,7 @@ import {
   getWalletTransactionsByDateRange,
 } from "@/lib/freee/wallet";
 import { estimateConsumptionTaxMethods } from "@/lib/ai/consumption-tax-estimate";
+import { listInvoicesForConsultation } from "@/lib/ai/consultation-invoices";
 
 type ToolOk<T> = { ok: true; data: T };
 type ToolErr = { ok: false; error: string };
@@ -221,6 +222,39 @@ export function createConsultationTools(auth: FreeeAuth) {
           });
           return txns;
         }),
+    }),
+
+    list_invoices: tool({
+      description:
+        "請求書一覧を請求日ベースで取得する。取引先名・件名・請求書番号などのキーワードで絞り込める。「〇〇の請求書をリストアップ」「直近3ヶ月の請求書」などに使う。失敗しても権限不足とは限らない。",
+      inputSchema: z.object({
+        monthsBack: z
+          .number()
+          .int()
+          .min(1)
+          .max(36)
+          .optional()
+          .describe("何ヶ月遡るか。未指定時は 3"),
+        query: z
+          .string()
+          .optional()
+          .describe("取引先名・件名・請求書番号などの部分一致キーワード"),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(50)
+          .optional()
+          .describe("返す最大件数。未指定時は 30"),
+      }),
+      execute: async (input) =>
+        wrap(async () =>
+          listInvoicesForConsultation(auth, {
+            monthsBack: input.monthsBack,
+            query: input.query,
+            limit: input.limit,
+          }),
+        ),
     }),
 
     estimate_consumption_tax: tool({

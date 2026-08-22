@@ -28,9 +28,26 @@ const CONSUMPTION_TAX_RECIPE: ConsultationRecipe = {
 - 結果は必ず「概算・要確認」とし、申告の最終判断はしない。`,
 };
 
+const INVOICE_LIST_PATTERN =
+  /請求書|invoice|送付待ち|取引先.*(請求|一覧)|リストアップ/;
+
+const INVOICE_LIST_RECIPE: ConsultationRecipe = {
+  id: "invoice-list",
+  match: ({ question, historyText }) =>
+    INVOICE_LIST_PATTERN.test(question) ||
+    INVOICE_LIST_PATTERN.test(historyText),
+  prompt: `請求書の一覧・検索向けガイド:
+- 必ず list_invoices を使う。取引先名・案件名は query に入れる（例: 博報堂プロダクツ）。
+- 「ここ三ヶ月」「直近Nヶ月」は monthsBack に反映する（未指定なら 3）。
+- 結果は請求日・取引先・件名・金額・送付／入金状態が分かる形で日本語にまとめる。
+- 0件なら権限不足と言わず、キーワードや期間を変えた再検索を提案する。
+- ツール名・フィールド名はユーザー向け文に出さない。`,
+};
+
 /** 登録順。先頭から評価し、最大 MAX_RECIPES 件まで返す */
 export const CONSULTATION_RECIPES: ConsultationRecipe[] = [
   CONSUMPTION_TAX_RECIPE,
+  INVOICE_LIST_RECIPE,
 ];
 
 export function buildRecipeHistoryText(
