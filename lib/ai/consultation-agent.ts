@@ -232,8 +232,9 @@ export async function runConsultationAgent(
     history,
   });
   logConsultationModelRoute(route, input.question);
-  const historyText = buildRecipeHistoryText(history);
-  const invoiceIntent = isInvoiceListIntent(input.question, historyText);
+  // ツール絞り込みは「今の質問」だけを見る。履歴に請求書があるだけで
+  // 損益など別話題を list_invoices 専用にしてしまわない。
+  const invoiceIntent = isInvoiceListIntent(input.question);
   const allTools = createConsultationTools(input.auth);
   const tools = invoiceIntent
     ? { list_invoices: allTools.list_invoices }
