@@ -46,6 +46,14 @@ describe("buildConsultationSystemPrompt", () => {
     ]);
     expect(system).toContain("## 追加ガイド（consumption-tax）");
   });
+
+  it("appends invoice-list recipe prioritizing prefetch data", () => {
+    const system = buildConsultationSystemPrompt(
+      "博報堂プロダクツの請求書をここ三ヶ月でリストアップして",
+    );
+    expect(system).toContain("## 追加ガイド（invoice-list）");
+    expect(system).toContain("【事前取得した請求書データ】");
+  });
 });
 
 describe("runConsultationAgent", () => {

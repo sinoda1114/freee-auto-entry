@@ -31,14 +31,22 @@ const CONSUMPTION_TAX_RECIPE: ConsultationRecipe = {
 const INVOICE_LIST_PATTERN =
   /請求書|invoice|送付待ち|取引先.*(請求|一覧)|リストアップ/;
 
+export function isInvoiceListIntent(
+  question: string,
+  historyText = "",
+): boolean {
+  return (
+    INVOICE_LIST_PATTERN.test(question) || INVOICE_LIST_PATTERN.test(historyText)
+  );
+}
+
 const INVOICE_LIST_RECIPE: ConsultationRecipe = {
   id: "invoice-list",
   match: ({ question, historyText }) =>
-    INVOICE_LIST_PATTERN.test(question) ||
-    INVOICE_LIST_PATTERN.test(historyText),
+    isInvoiceListIntent(question, historyText),
   prompt: `請求書の一覧・検索向けガイド:
-- 必ず list_invoices を使う。取引先名・案件名は query に入れる（例: 博報堂プロダクツ）。
-- 「ここ三ヶ月」「直近Nヶ月」は monthsBack に反映する（未指定なら 3）。
+- ユーザーメッセージに【事前取得した請求書データ】がある場合は、それを最優先の根拠にする。
+- 追加で絞り込むときだけ list_invoices を使う。口座明細・元帳・振替には切り替えない。
 - 結果は請求日・取引先・件名・金額・送付／入金状態が分かる形で日本語にまとめる。
 - 0件なら権限不足と言わず、キーワードや期間を変えた再検索を提案する。
 - ツール名・フィールド名はユーザー向け文に出さない。`,

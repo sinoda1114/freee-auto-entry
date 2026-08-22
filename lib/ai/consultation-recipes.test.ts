@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   appendRecipesToSystem,
   buildRecipeHistoryText,
+  isInvoiceListIntent,
   selectRecipes,
 } from "./consultation-recipes";
 
@@ -39,6 +40,20 @@ describe("selectRecipes", () => {
       "",
     );
     expect(recipes.map((r) => r.id)).toEqual(["invoice-list"]);
+  });
+});
+
+describe("isInvoiceListIntent", () => {
+  it("detects invoice listing questions", () => {
+    expect(
+      isInvoiceListIntent(
+        "博報堂プロダクツの請求書をここ三ヶ月でリストアップして",
+      ),
+    ).toBe(true);
+  });
+
+  it("is false for unrelated questions", () => {
+    expect(isInvoiceListIntent("この振替はなぜ現金？")).toBe(false);
   });
 });
 
