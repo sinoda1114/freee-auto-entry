@@ -2,6 +2,8 @@
 /** @typedef {import('@playwright/test').Route} Route */
 
 export const E2E_COMPANY_ID = "11122591";
+export const E2E_SHINODA_IT_COMPANY_ID = "11040830";
+export const E2E_NON_EXPENSE_COMPANY_ID = "99999999";
 const E2E_BOOTSTRAP_TOKEN =
   process.env.E2E_BOOTSTRAP_TOKEN ?? "e2e-bootstrap-token";
 
@@ -180,11 +182,18 @@ export async function registerFreeeApiMocks(page) {
   );
 }
 
-/** @param {Page} page */
-export async function bootstrapE2ESession(page) {
+/**
+ * @param {Page} page
+ * @param {{ companyId?: string }} [options]
+ */
+export async function bootstrapE2ESession(page, options = {}) {
   const response = await page.request.post("/api/e2e/bootstrap", {
     headers: {
       Authorization: `Bearer ${E2E_BOOTSTRAP_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    data: {
+      companyId: options.companyId ?? E2E_COMPANY_ID,
     },
   });
   if (!response.ok()) {
