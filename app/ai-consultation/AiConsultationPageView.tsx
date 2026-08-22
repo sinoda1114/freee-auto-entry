@@ -24,6 +24,7 @@ export function AiConsultationPageView({
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         showOpenInNewTab={false}
+        showDockBack
         showViewModeControls={false}
         autoFocusQuestion
         shellClassName="h-full min-h-0 rounded-lg"

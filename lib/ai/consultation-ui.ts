@@ -147,6 +147,23 @@ export function saveConsultationPanelSize(size: ConsultationPanelSize): void {
 
 export const AI_CONSULTATION_POPOUT_PATH = "/ai-consultation?popout=1";
 export const AI_CONSULTATION_POPOUT_NAME = "freee-ai-consultation-popout";
+export const AI_CONSULTATION_DOCK_MESSAGE = "freee-ai-consultation-dock";
+
+/** ポップアウト窓から本体タブの FAB を開かせて閉じる */
+export function dockAiConsultationPopout(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const opener = window.opener as Window | null;
+  if (opener && !opener.closed) {
+    opener.postMessage(
+      { type: AI_CONSULTATION_DOCK_MESSAGE },
+      window.location.origin,
+    );
+    opener.focus();
+  }
+  window.close();
+}
 
 /** FAB から切り離したポップアップ窓を開く（同名なら再利用） */
 export function openAiConsultationPopout(

@@ -16,6 +16,14 @@ import {
 import { aiConsultationAction } from "@/app/ai-consultation-action";
 import { ConsultationReportView } from "@/app/components/ConsultationReportView";
 import { ConsultationFontSizeControl } from "@/app/components/ConsultationFontSizeControl";
+import {
+  ClearChatIcon,
+  CloseIcon,
+  CompressIcon,
+  DockBackIcon,
+  ExpandIcon,
+  PopoutIcon,
+} from "@/app/components/ConsultationHeaderIcons";
 import { RelatedSupportThreads } from "@/app/components/RelatedSupportThreads";
 import {
   clampConsultationFontSize,
@@ -24,6 +32,7 @@ import {
   type ConsultationChatMessage,
   type ConsultationViewMode,
   clearConsultationState,
+  dockAiConsultationPopout,
   loadConsultationFontSize,
   loadConsultationState,
   openAiConsultationPopout,
@@ -35,8 +44,7 @@ import {
 import { stashSupportDraft } from "@/lib/support/draft-handoff";
 
 const HEADER_ACTION_CLASS =
-  "rounded-md px-2 py-1 text-xs font-semibold text-white/95 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--freee-blue-dark)] disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm";
-
+  "inline-flex size-8 items-center justify-center rounded-md text-white/95 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--freee-blue-dark)] disabled:cursor-not-allowed disabled:opacity-40";
 const CHAT_INPUT_CLASS = "text-[1em] leading-relaxed";
 
 export function useAiConsultationChat(companyId: string) {
@@ -148,6 +156,8 @@ interface AiConsultationPanelProps {
   onViewModeChange: (mode: ConsultationViewMode) => void;
   onClose?: () => void;
   showOpenInNewTab?: boolean;
+  /** ポップアウト窓から本体FABへ戻すボタン */
+  showDockBack?: boolean;
   showViewModeControls?: boolean;
   autoFocusQuestion?: boolean;
   bodyClassName?: string;
@@ -218,6 +228,7 @@ export function AiConsultationPanel({
   onViewModeChange,
   onClose,
   showOpenInNewTab = true,
+  showDockBack = false,
   showViewModeControls = true,
   autoFocusQuestion = false,
   bodyClassName = "",
@@ -293,6 +304,11 @@ export function AiConsultationPanel({
     onClose?.();
   }
 
+  function dockBack() {
+    saveConsultationState({ messages, targetHint, viewMode: "compact" });
+    dockAiConsultationPopout();
+  }
+
   function toggleFullscreen() {
     onViewModeChange(viewMode === "fullscreen" ? "compact" : "fullscreen");
   }
@@ -314,7 +330,6 @@ export function AiConsultationPanel({
   }
 
   const isFullscreen = viewMode === "fullscreen";
-  const fullscreenToggleLabel = isFullscreen ? "戻す" : "全画面";
   const chatFontStyle = { fontSize: `${fontSize}px` };
 
   return (
@@ -330,7 +345,7 @@ export function AiConsultationPanel({
         <div className="min-w-0">
           <p className="text-sm font-bold sm:text-base">AIに相談する</p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-0.5">
           <ConsultationFontSizeControl
             fontSize={fontSize}
             onFontSizeChange={updateFontSize}
@@ -342,8 +357,9 @@ export function AiConsultationPanel({
             onClick={clearChat}
             disabled={!canClear}
             aria-label="会話をクリア"
+            title="クリア"
           >
-            クリア
+            <ClearChatIcon />
           </button>
           {showViewModeControls ? (
             <button
@@ -354,31 +370,43 @@ export function AiConsultationPanel({
                   ? "コンパクト表示に戻す"
                   : `全画面にする（現在: ${VIEW_MODE_LABELS[viewMode]}）`
               }
-              title={fullscreenToggleLabel}
+              title={isFullscreen ? "コンパクトに戻す" : "全画面"}
               onClick={toggleFullscreen}
             >
-              {fullscreenToggleLabel}
+              {isFullscreen ? <CompressIcon /> : <ExpandIcon />}
             </button>
           ) : null}
           {showOpenInNewTab ? (
             <button
               type="button"
-              className={`hidden sm:inline ${HEADER_ACTION_CLASS}`}
+              className={HEADER_ACTION_CLASS}
               aria-label="ポップアウトして別ウィンドウで開く"
               title="ポップアウト"
               onClick={openPopout}
             >
-              ポップアウト
+              <PopoutIcon />
+            </button>
+          ) : null}
+          {showDockBack ? (
+            <button
+              type="button"
+              className={HEADER_ACTION_CLASS}
+              aria-label="本体のFABに戻す"
+              title="FABに戻す"
+              onClick={dockBack}
+            >
+              <DockBackIcon />
             </button>
           ) : null}
           {onClose ? (
             <button
               type="button"
               aria-label="閉じる"
-              className={`text-lg leading-none ${HEADER_ACTION_CLASS}`}
+              title="閉じる"
+              className={HEADER_ACTION_CLASS}
               onClick={onClose}
             >
-              ×
+              <CloseIcon />
             </button>
           ) : null}
         </div>
@@ -468,16 +496,6 @@ export function AiConsultationPanel({
           }}
         />
         <div className="flex flex-wrap items-center gap-2">
-          {showOpenInNewTab ? (
-            <Button
-              size="md"
-              variant="bordered"
-              className="font-semibold sm:hidden"
-              onPress={openPopout}
-            >
-              ポップアウト
-            </Button>
-          ) : null}
           <span
             id={keyboardHintId}
             className="hidden text-xs text-[var(--freee-text-muted)] sm:inline"

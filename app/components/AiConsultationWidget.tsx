@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
 import { usePathname } from "next/navigation";
 import { AiConsultationPanel } from "./AiConsultationPanel";
 import {
+  AI_CONSULTATION_DOCK_MESSAGE,
   clampConsultationPanelSize,
   CONSULTATION_PANEL_CLASS,
   loadConsultationPanelSize,
@@ -54,6 +55,24 @@ export function AiConsultationWidget({
     }
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+      if (
+        event.data &&
+        typeof event.data === "object" &&
+        event.data.type === AI_CONSULTATION_DOCK_MESSAGE
+      ) {
+        setOpen(true);
+        setViewMode("compact");
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
   }, []);
 
   useEffect(() => {

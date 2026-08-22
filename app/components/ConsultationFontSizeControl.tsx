@@ -6,6 +6,7 @@ import {
   CONSULTATION_FONT_SIZE_MAX,
   CONSULTATION_FONT_SIZE_MIN,
 } from "@/lib/ai/consultation-ui";
+import { FontSizeIcon } from "@/app/components/ConsultationHeaderIcons";
 
 interface ConsultationFontSizeControlProps {
   fontSize: number;
@@ -59,7 +60,7 @@ export function ConsultationFontSizeControl({
         title="文字サイズ（ホイールでも変更）"
         onClick={() => setOpen((value) => !value)}
       >
-        Aa
+        <FontSizeIcon />
       </button>
       {open ? (
         <div
