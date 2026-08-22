@@ -26,9 +26,11 @@ import {
   clearConsultationState,
   loadConsultationFontSize,
   loadConsultationState,
+  openAiConsultationPopout,
   saveConsultationFontSize,
   saveConsultationState,
   VIEW_MODE_LABELS,
+  type ConsultationPanelSize,
 } from "@/lib/ai/consultation-ui";
 import { stashSupportDraft } from "@/lib/support/draft-handoff";
 
@@ -151,6 +153,8 @@ interface AiConsultationPanelProps {
   bodyClassName?: string;
   shellClassName?: string;
   panelId?: string;
+  /** ポップアウト窓の初期サイズ（未指定時は既定値） */
+  popoutSize?: ConsultationPanelSize;
 }
 
 function AssistantMessage({
@@ -219,6 +223,7 @@ export function AiConsultationPanel({
   bodyClassName = "",
   shellClassName = "",
   panelId,
+  popoutSize,
 }: AiConsultationPanelProps) {
   const {
     question,
@@ -282,9 +287,10 @@ export function AiConsultationPanel({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose, onViewModeChange, viewMode]);
 
-  function openInNewTab() {
+  function openPopout() {
     saveConsultationState({ messages, targetHint, viewMode: "compact" });
-    window.open("/ai-consultation", "_blank", "noopener,noreferrer");
+    openAiConsultationPopout(popoutSize);
+    onClose?.();
   }
 
   function toggleFullscreen() {
@@ -358,9 +364,11 @@ export function AiConsultationPanel({
             <button
               type="button"
               className={`hidden sm:inline ${HEADER_ACTION_CLASS}`}
-              onClick={openInNewTab}
+              aria-label="ポップアウトして別ウィンドウで開く"
+              title="ポップアウト"
+              onClick={openPopout}
             >
-              別画面
+              ポップアウト
             </button>
           ) : null}
           {onClose ? (
@@ -465,9 +473,9 @@ export function AiConsultationPanel({
               size="md"
               variant="bordered"
               className="font-semibold sm:hidden"
-              onPress={openInNewTab}
+              onPress={openPopout}
             >
-              別画面
+              ポップアウト
             </Button>
           ) : null}
           <span

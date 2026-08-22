@@ -98,4 +98,32 @@ describe("AiConsultationPanel font size", () => {
       fontSize: `${CONSULTATION_FONT_SIZE_DEFAULT + 1}px`,
     });
   });
+
+  it("pops out into a window and closes the FAB panel", () => {
+    const onClose = vi.fn();
+    const focus = vi.fn();
+    const open = vi.fn(() => ({ focus }));
+    vi.stubGlobal("open", open);
+
+    render(
+      <AiConsultationPanel
+        companyId="11122591"
+        viewMode="compact"
+        onViewModeChange={() => {}}
+        onClose={onClose}
+        popoutSize={{ width: 520, height: 380 }}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "ポップアウトして別ウィンドウで開く" }),
+    );
+
+    expect(open).toHaveBeenCalledWith(
+      "/ai-consultation?popout=1",
+      "freee-ai-consultation-popout",
+      expect.stringContaining("width=520"),
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
 });

@@ -1,5 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  AI_CONSULTATION_POPOUT_NAME,
+  AI_CONSULTATION_POPOUT_PATH,
   CONSULTATION_FONT_SIZE_DEFAULT,
   CONSULTATION_FONT_SIZE_MAX,
   CONSULTATION_FONT_SIZE_MIN,
@@ -9,6 +11,7 @@ import {
   clampConsultationPanelSize,
   loadConsultationFontSize,
   loadConsultationPanelSize,
+  openAiConsultationPopout,
   saveConsultationFontSize,
   saveConsultationPanelSize,
 } from "./consultation-ui";
@@ -72,5 +75,39 @@ describe("consultation panel size", () => {
   it("persists and reloads panel size", () => {
     saveConsultationPanelSize({ width: 520, height: 360 });
     expect(loadConsultationPanelSize()).toEqual({ width: 520, height: 360 });
+  });
+});
+
+describe("openAiConsultationPopout", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("opens a named popup with panel size", () => {
+    const focus = vi.fn();
+    const open = vi.fn(() => ({ focus }));
+    vi.stubGlobal("open", open);
+    Object.defineProperty(window, "screenLeft", { value: 0, configurable: true });
+    Object.defineProperty(window, "screenTop", { value: 0, configurable: true });
+    Object.defineProperty(window, "outerWidth", {
+      value: 1200,
+      configurable: true,
+    });
+    Object.defineProperty(window, "outerHeight", {
+      value: 800,
+      configurable: true,
+    });
+
+    openAiConsultationPopout({ width: 500, height: 400 });
+
+    expect(open).toHaveBeenCalledWith(
+      AI_CONSULTATION_POPOUT_PATH,
+      AI_CONSULTATION_POPOUT_NAME,
+      expect.stringMatching(/width=500.*height=400|height=400.*width=500/),
+    );
+    const features = String(open.mock.calls.at(0)?.at(2) ?? "");
+    expect(features).toContain("popup=yes");
+    expect(focus).toHaveBeenCalled();
   });
 });

@@ -166,6 +166,7 @@ export function AiConsultationWidget({
             onClose={() => setOpen(false)}
             autoFocusQuestion
             panelId={panelId}
+            popoutSize={panelSize}
             shellClassName="h-full"
             bodyClassName={panelClass.body}
           />

@@ -30,6 +30,7 @@ export function AppNavbar({
 }: AppNavbarProps) {
   return (
     <>
+      <div data-app-header>
       <Navbar
         maxWidth="xl"
         isBordered
@@ -89,6 +90,7 @@ export function AppNavbar({
         )}
       </NavbarContent>
       </Navbar>
+      </div>
       {authenticated && activeCompanyId ? (
         <AiConsultationWidget companyId={activeCompanyId} />
       ) : null}

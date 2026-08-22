@@ -9,11 +9,28 @@ import {
 
 export function AiConsultationPageView({
   companyId,
+  popout = false,
 }: {
   companyId: string;
+  popout?: boolean;
 }) {
   const [viewMode, setViewMode] = useState<ConsultationViewMode>("expanded");
   const panelClass = CONSULTATION_PANEL_CLASS[viewMode];
+
+  if (popout) {
+    return (
+      <AiConsultationPanel
+        companyId={companyId}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        showOpenInNewTab={false}
+        showViewModeControls={false}
+        autoFocusQuestion
+        shellClassName="h-full min-h-0 rounded-lg"
+        bodyClassName={`${panelClass.body} max-h-none`}
+      />
+    );
+  }
 
   return (
     <div className="mt-4">
