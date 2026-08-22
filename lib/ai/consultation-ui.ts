@@ -145,6 +145,49 @@ export function saveConsultationPanelSize(size: ConsultationPanelSize): void {
   }
 }
 
+export const AI_CONSULTATION_POPOUT_PATH = "/ai-consultation?popout=1";
+export const AI_CONSULTATION_POPOUT_NAME = "freee-ai-consultation-popout";
+
+/** FAB から切り離したポップアップ窓を開く（同名なら再利用） */
+export function openAiConsultationPopout(
+  size?: Partial<ConsultationPanelSize>,
+): Window | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const clamped = clampConsultationPanelSize({
+    width: size?.width ?? CONSULTATION_PANEL_WIDTH_DEFAULT,
+    height: size?.height ?? CONSULTATION_PANEL_HEIGHT_DEFAULT,
+  });
+  const dualScreenLeft =
+    window.screenLeft !== undefined ? window.screenLeft : window.screenX;
+  const dualScreenTop =
+    window.screenTop !== undefined ? window.screenTop : window.screenY;
+  const left = Math.max(
+    0,
+    dualScreenLeft + Math.round((window.outerWidth - clamped.width) / 2),
+  );
+  const top = Math.max(
+    0,
+    dualScreenTop + Math.round((window.outerHeight - clamped.height) / 2),
+  );
+  const features = [
+    "popup=yes",
+    `width=${clamped.width}`,
+    `height=${clamped.height}`,
+    `left=${left}`,
+    `top=${top}`,
+  ].join(",");
+
+  const popup = window.open(
+    AI_CONSULTATION_POPOUT_PATH,
+    AI_CONSULTATION_POPOUT_NAME,
+    features,
+  );
+  popup?.focus();
+  return popup;
+}
+
 export function createConsultationMessageId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();

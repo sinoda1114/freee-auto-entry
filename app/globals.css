@@ -168,3 +168,12 @@ body {
     color: var(--freee-text);
   }
 }
+
+/* FAB ポップアウト窓: アプリヘッダーを隠してチャットを全面表示 */
+html.ai-consultation-popout [data-app-header] {
+  display: none !important;
+}
+
+html.ai-consultation-popout #main-content {
+  min-height: 100dvh;
+}
