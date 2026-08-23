@@ -556,14 +556,14 @@ export function ExpenseForm({
 
       <label className="flex flex-col gap-1">
         <span className="text-sm text-zinc-600 dark:text-zinc-400">
-          摘要
+          摘要（任意）
         </span>
         <input
           type="text"
           name="description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          required
+          placeholder="空欄でも登録できます"
           className="rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
         />
       </label>

@@ -80,8 +80,8 @@ export async function createExpenseAction(
       ? [Number(receiptIdRaw)]
       : undefined;
 
-  if (!issueDate || !accountItemId || !taxCode || !amount || !description) {
-    return { status: "error", message: "すべての項目を入力してください。" };
+  if (!issueDate || !accountItemId || !taxCode || !amount) {
+    return { status: "error", message: "発生日・勘定科目・税区分・金額を入力してください。" };
   }
 
   try {
@@ -91,7 +91,7 @@ export async function createExpenseAction(
       accountItemId,
       taxCode,
       amount,
-      description,
+      ...(description.trim() ? { description: description.trim() } : {}),
       memoTagIds: memoTagId ? [memoTagId] : undefined,
       receiptIds,
     });
