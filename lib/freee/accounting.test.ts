@@ -136,6 +136,24 @@ describe("accounting API client", () => {
     ]);
   });
 
+  it("createDeal omits description when empty", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ deal: { id: 43 } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createDeal(auth, {
+      issueDate: "2026-07-11",
+      accountItemId: 10,
+      taxCode: 1,
+      amount: 5000,
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string);
+    expect(body.details[0].description).toBeUndefined();
+  });
+
   it("throws when the API responds with an error status", async () => {
     vi.stubGlobal(
       "fetch",
