@@ -42,7 +42,8 @@ export interface CreateDealInput {
   accountItemId: number;
   taxCode: number;
   amount: number;
-  description: string;
+  /** freee API では任意。空なら送らない。 */
+  description?: string;
   memoTagIds?: number[];
   receiptIds?: number[];
 }
@@ -141,7 +142,9 @@ export async function createDeal(
           account_item_id: input.accountItemId,
           tax_code: input.taxCode,
           amount: input.amount,
-          description: input.description,
+          ...(input.description?.trim()
+            ? { description: input.description.trim() }
+            : {}),
           ...(input.memoTagIds ? { tag_ids: input.memoTagIds } : {}),
         },
       ],
