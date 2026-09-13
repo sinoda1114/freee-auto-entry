@@ -9,10 +9,15 @@ export type AccountItemPrefsStorage = {
 };
 
 function defaultStorage(): AccountItemPrefsStorage | null {
-  if (typeof window === "undefined" || !window.localStorage) {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return null;
+    }
+    return window.localStorage;
+  } catch {
+    // Private mode / blocked storage
     return null;
   }
-  return window.localStorage;
 }
 
 function recentKey(companyId: string): string {
@@ -60,7 +65,11 @@ function writeIdList(
   if (!storage) {
     return;
   }
-  storage.setItem(key, JSON.stringify(ids));
+  try {
+    storage.setItem(key, JSON.stringify(ids));
+  } catch {
+    // ignore quota / security errors
+  }
 }
 
 export function loadRecentAccountItemIds(

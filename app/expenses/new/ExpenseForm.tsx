@@ -65,8 +65,13 @@ export function ExpenseForm({
     null,
   );
   const [isDragging, setIsDragging] = useState(false);
-  const [recentIds, setRecentIds] = useState<number[]>([]);
-  const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
+  const [recentIds, setRecentIds] = useState<number[]>(() =>
+    typeof window === "undefined" ? [] : loadRecentAccountItemIds(companyId),
+  );
+  const [favoriteIds, setFavoriteIds] = useState<number[]>(() =>
+    typeof window === "undefined" ? [] : loadFavoriteAccountItemIds(companyId),
+  );
+  const [prefsCompanyId, setPrefsCompanyId] = useState(companyId);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -81,10 +86,11 @@ export function ExpenseForm({
     };
   }, [previewUrl]);
 
-  useEffect(() => {
+  if (companyId !== prefsCompanyId) {
+    setPrefsCompanyId(companyId);
     setRecentIds(loadRecentAccountItemIds(companyId));
     setFavoriteIds(loadFavoriteAccountItemIds(companyId));
-  }, [companyId]);
+  }
 
   const favoriteItems = resolveAccountItemsByIds(accountItems, favoriteIds);
   const recentItems = resolveAccountItemsByIds(
@@ -511,52 +517,44 @@ export function ExpenseForm({
       </label>
 
       <div className="flex flex-col gap-2">
-        {favoriteItems.length > 0 ? (
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-              よく使う
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {favoriteItems.map((item) => (
-                <button
-                  key={`fav-${item.id}`}
-                  type="button"
-                  onClick={() => handleAccountItemChange(String(item.id))}
-                  className={`rounded-full border px-2.5 py-1 text-xs ${
-                    accountItemId === String(item.id)
-                      ? "border-[var(--freee-blue)] bg-[color-mix(in_srgb,var(--freee-blue)_16%,transparent)] text-[var(--freee-text)]"
-                      : "border-zinc-300 text-zinc-700 dark:border-zinc-600 dark:text-zinc-200"
-                  }`}
-                >
-                  ★ {item.name}
-                </button>
-              ))}
+        {(
+          [
+            { label: "よく使う", items: favoriteItems, starred: true },
+            { label: "最近使った", items: recentItems, starred: false },
+          ] as const
+        ).map((section) =>
+          section.items.length === 0 ? null : (
+            <div key={section.label} className="flex flex-col gap-1">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                {section.label}
+              </span>
+              <div
+                className="flex flex-wrap gap-1.5"
+                role="group"
+                aria-label={section.label}
+              >
+                {section.items.map((item) => {
+                  const selected = accountItemId === String(item.id);
+                  return (
+                    <button
+                      key={`${section.label}-${item.id}`}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => handleAccountItemChange(String(item.id))}
+                      className={`rounded-full border px-2.5 py-1 text-xs ${
+                        selected
+                          ? "border-[var(--freee-blue)] bg-[color-mix(in_srgb,var(--freee-blue)_16%,transparent)] text-[var(--freee-text)]"
+                          : "border-zinc-300 text-zinc-700 dark:border-zinc-600 dark:text-zinc-200"
+                      }`}
+                    >
+                      {section.starred ? `★ ${item.name}` : item.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ) : null}
-        {recentItems.length > 0 ? (
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-              最近使った
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {recentItems.map((item) => (
-                <button
-                  key={`recent-${item.id}`}
-                  type="button"
-                  onClick={() => handleAccountItemChange(String(item.id))}
-                  className={`rounded-full border px-2.5 py-1 text-xs ${
-                    accountItemId === String(item.id)
-                      ? "border-[var(--freee-blue)] bg-[color-mix(in_srgb,var(--freee-blue)_16%,transparent)] text-[var(--freee-text)]"
-                      : "border-zinc-300 text-zinc-700 dark:border-zinc-600 dark:text-zinc-200"
-                  }`}
-                >
-                  {item.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
+          ),
+        )}
 
         <div className="flex items-end gap-2">
           <div className="min-w-0 flex-1">

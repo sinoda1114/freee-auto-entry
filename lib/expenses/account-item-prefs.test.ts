@@ -75,4 +75,17 @@ describe("account-item-prefs", () => {
       { id: 1, name: "消耗品費" },
     ]);
   });
+
+  it("does not throw when storage setItem fails", () => {
+    const storage: AccountItemPrefsStorage = {
+      getItem() {
+        return null;
+      },
+      setItem() {
+        throw new Error("quota");
+      },
+    };
+    expect(() => recordRecentAccountItemId("c1", 1, storage)).not.toThrow();
+    expect(() => toggleFavoriteAccountItemId("c1", 1, storage)).not.toThrow();
+  });
 });
