@@ -8,11 +8,13 @@ import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
 import { ExpenseForm } from "./ExpenseForm";
 
 interface ExpensePageViewProps {
+  companyId: string;
   accountItems: AccountItem[];
   taxCodes: TaxCode[];
 }
 
 export function ExpensePageView({
+  companyId,
   accountItems,
   taxCodes,
 }: ExpensePageViewProps) {
@@ -42,7 +44,11 @@ export function ExpensePageView({
         で CSV 取り込み（または Android でかざし）できます。
       </p>
       <div className="panel mt-4 px-4 py-4">
-        <ExpenseForm accountItems={accountItems} taxCodes={taxCodes} />
+        <ExpenseForm
+          companyId={companyId}
+          accountItems={accountItems}
+          taxCodes={taxCodes}
+        />
       </div>
     </PageShell>
   );
