@@ -35,5 +35,11 @@ export default async function NewExpensePage() {
     getTaxCodes(auth),
   ]);
 
-  return <ExpensePageView accountItems={accountItems} taxCodes={taxCodes} />;
+  return (
+    <ExpensePageView
+      companyId={auth.companyId}
+      accountItems={accountItems}
+      taxCodes={taxCodes}
+    />
+  );
 }

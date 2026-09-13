@@ -19,6 +19,13 @@ import {
   ocrReceiptAction,
   type ExpenseFormState,
 } from "./actions";
+import {
+  loadFavoriteAccountItemIds,
+  loadRecentAccountItemIds,
+  recordRecentAccountItemId,
+  resolveAccountItemsByIds,
+  toggleFavoriteAccountItemId,
+} from "@/lib/expenses/account-item-prefs";
 
 const initialState: ExpenseFormState = { status: "idle" };
 
@@ -30,9 +37,11 @@ const fieldClassName =
   "rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900";
 
 export function ExpenseForm({
+  companyId,
   accountItems,
   taxCodes,
 }: {
+  companyId: string;
   accountItems: AccountItem[];
   taxCodes: TaxCode[];
 }) {
@@ -56,6 +65,8 @@ export function ExpenseForm({
     null,
   );
   const [isDragging, setIsDragging] = useState(false);
+  const [recentIds, setRecentIds] = useState<number[]>([]);
+  const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +80,21 @@ export function ExpenseForm({
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  useEffect(() => {
+    // SSR と初回 HTML を一致させ、マウント後だけ localStorage を読む
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only prefs hydration
+    setRecentIds(loadRecentAccountItemIds(companyId));
+    setFavoriteIds(loadFavoriteAccountItemIds(companyId));
+  }, [companyId]);
+
+  const favoriteItems = resolveAccountItemsByIds(accountItems, favoriteIds);
+  const recentItems = resolveAccountItemsByIds(
+    accountItems,
+    recentIds.filter((id) => !favoriteIds.includes(id)),
+  );
+  const selectedIsFavorite =
+    accountItemId !== "" && favoriteIds.includes(Number(accountItemId));
 
   function resetFormFields() {
     selectedFileRef.current = null;
@@ -242,10 +268,16 @@ export function ExpenseForm({
   }
 
   function handleSubmit(formData: FormData) {
+    const submittedAccountItemId = Number(formData.get("accountItemId"));
     startSubmitTransition(async () => {
       const result = await createExpenseAction(state, formData);
       setState(result);
       if (result.status === "success" && result.dealId) {
+        if (Number.isFinite(submittedAccountItemId) && submittedAccountItemId > 0) {
+          setRecentIds(
+            recordRecentAccountItemId(companyId, submittedAccountItemId),
+          );
+        }
         setLastSuccessDealId(result.dealId);
         notifySuccess(
           "登録しました",
@@ -480,43 +512,114 @@ export function ExpenseForm({
         />
       </label>
 
-      <div className="flex flex-col gap-1">
-        <input type="hidden" name="accountItemId" value={accountItemId} />
-        <Autocomplete
-          label="勘定科目"
-          aria-label="勘定科目"
-          placeholder="科目名で検索"
-          selectedKey={accountItemId || null}
-          inputValue={accountInputValue}
-          onInputChange={(value) => {
-            setAccountInputValue(value);
-            if (!value) {
-              setAccountItemId("");
+      <div className="flex flex-col gap-2">
+        {(
+          [
+            { label: "よく使う", items: favoriteItems, starred: true },
+            { label: "最近使った", items: recentItems, starred: false },
+          ] as const
+        ).map((section) =>
+          section.items.length === 0 ? null : (
+            <div key={section.label} className="flex flex-col gap-1">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                {section.label}
+              </span>
+              <div
+                className="flex flex-wrap gap-1.5"
+                role="group"
+                aria-label={section.label}
+              >
+                {section.items.map((item) => {
+                  const selected = accountItemId === String(item.id);
+                  return (
+                    <button
+                      key={`${section.label}-${item.id}`}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => handleAccountItemChange(String(item.id))}
+                      className={`rounded-full border px-2.5 py-1 text-xs ${
+                        selected
+                          ? "border-[var(--freee-blue)] bg-[color-mix(in_srgb,var(--freee-blue)_16%,transparent)] text-[var(--freee-text)]"
+                          : "border-zinc-300 text-zinc-700 dark:border-zinc-600 dark:text-zinc-200"
+                      }`}
+                    >
+                      {section.starred ? (
+                        <>
+                          <span aria-hidden="true">★ </span>
+                          {item.name}
+                        </>
+                      ) : (
+                        item.name
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ),
+        )}
+
+        <div className="flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <input type="hidden" name="accountItemId" value={accountItemId} />
+            <Autocomplete
+              label="勘定科目"
+              aria-label="勘定科目"
+              placeholder="科目名で検索"
+              selectedKey={accountItemId || null}
+              inputValue={accountInputValue}
+              onInputChange={(value) => {
+                setAccountInputValue(value);
+                if (!value) {
+                  setAccountItemId("");
+                }
+              }}
+              onSelectionChange={(key) => {
+                handleAccountItemChange(key?.toString() ?? "");
+              }}
+              isRequired
+              size="sm"
+              variant="bordered"
+              classNames={{
+                base: "text-sm",
+                listboxWrapper: "max-h-56",
+              }}
+              inputProps={{
+                classNames: {
+                  inputWrapper:
+                    "border-[var(--freee-border)] bg-[var(--freee-surface)]",
+                },
+              }}
+            >
+              {accountItems.map((item) => (
+                <AutocompleteItem key={String(item.id)} textValue={item.name}>
+                  {item.name}
+                </AutocompleteItem>
+              ))}
+            </Autocomplete>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="bordered"
+            isDisabled={!accountItemId}
+            aria-label={
+              selectedIsFavorite
+                ? "よく使うから外す"
+                : "よく使うに追加"
             }
-          }}
-          onSelectionChange={(key) => {
-            handleAccountItemChange(key?.toString() ?? "");
-          }}
-          isRequired
-          size="sm"
-          variant="bordered"
-          classNames={{
-            base: "text-sm",
-            listboxWrapper: "max-h-56",
-          }}
-          inputProps={{
-            classNames: {
-              inputWrapper:
-                "border-[var(--freee-border)] bg-[var(--freee-surface)]",
-            },
-          }}
-        >
-          {accountItems.map((item) => (
-            <AutocompleteItem key={String(item.id)} textValue={item.name}>
-              {item.name}
-            </AutocompleteItem>
-          ))}
-        </Autocomplete>
+            className="mb-0.5 shrink-0 border-[var(--freee-border)]"
+            onPress={() => {
+              const id = Number(accountItemId);
+              if (!Number.isFinite(id) || id <= 0) {
+                return;
+              }
+              setFavoriteIds(toggleFavoriteAccountItemId(companyId, id));
+            }}
+          >
+            {selectedIsFavorite ? "★" : "☆"}
+          </Button>
+        </div>
       </div>
 
       <label className="flex flex-col gap-1">
