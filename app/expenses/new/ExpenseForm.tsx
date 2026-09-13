@@ -65,13 +65,8 @@ export function ExpenseForm({
     null,
   );
   const [isDragging, setIsDragging] = useState(false);
-  const [recentIds, setRecentIds] = useState<number[]>(() =>
-    typeof window === "undefined" ? [] : loadRecentAccountItemIds(companyId),
-  );
-  const [favoriteIds, setFavoriteIds] = useState<number[]>(() =>
-    typeof window === "undefined" ? [] : loadFavoriteAccountItemIds(companyId),
-  );
-  const [prefsCompanyId, setPrefsCompanyId] = useState(companyId);
+  const [recentIds, setRecentIds] = useState<number[]>([]);
+  const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -86,11 +81,12 @@ export function ExpenseForm({
     };
   }, [previewUrl]);
 
-  if (companyId !== prefsCompanyId) {
-    setPrefsCompanyId(companyId);
+  useEffect(() => {
+    // SSR と初回 HTML を一致させ、マウント後だけ localStorage を読む
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only prefs hydration
     setRecentIds(loadRecentAccountItemIds(companyId));
     setFavoriteIds(loadFavoriteAccountItemIds(companyId));
-  }
+  }, [companyId]);
 
   const favoriteItems = resolveAccountItemsByIds(accountItems, favoriteIds);
   const recentItems = resolveAccountItemsByIds(
@@ -547,7 +543,14 @@ export function ExpenseForm({
                           : "border-zinc-300 text-zinc-700 dark:border-zinc-600 dark:text-zinc-200"
                       }`}
                     >
-                      {section.starred ? `★ ${item.name}` : item.name}
+                      {section.starred ? (
+                        <>
+                          <span aria-hidden="true">★ </span>
+                          {item.name}
+                        </>
+                      ) : (
+                        item.name
+                      )}
                     </button>
                   );
                 })}
