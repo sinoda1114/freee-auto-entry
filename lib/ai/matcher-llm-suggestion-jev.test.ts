@@ -155,6 +155,11 @@ describe("suggestBatchMatcherRulesWithLlm JEV gate", () => {
     const prompt = String(vi.mocked(generateGeminiJson).mock.calls[0]?.[0]);
     expect(prompt).toContain("会議ランチ");
     expect(prompt).not.toContain("DAZN");
+    expect(prompt).toContain("up to 9");
+    const schema = vi.mocked(generateGeminiJson).mock.calls[0]?.[1] as {
+      properties?: { rules?: { maxItems?: number } };
+    };
+    expect(schema.properties?.rules?.maxItems).toBe(9);
   });
 
   it("returns JEV-only rules when Gemini fails after a partial hit", async () => {

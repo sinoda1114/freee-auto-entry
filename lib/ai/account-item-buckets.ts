@@ -32,7 +32,7 @@ const BUCKET_DEFS: readonly BucketDef[] = [
   {
     key: "payroll",
     label: "人件費",
-    pattern: /給与|賃金|賞与|役員報酬|法定福利|福利厚生|退職|通勤手当/,
+    pattern: /給料|給与|賃金|賞与|役員報酬|法定福利|福利厚生|退職|通勤手当/,
   },
   {
     key: "travel",
