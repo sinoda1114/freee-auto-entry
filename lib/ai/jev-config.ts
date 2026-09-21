@@ -3,6 +3,9 @@ import { isE2ETestMode } from "@/lib/e2e/fixtures";
 export const DEFAULT_JEV_BASE_URL = "https://api.typesafe.ai/v1/systemone";
 export const DEFAULT_JEV_MODEL = "jev-latest";
 export const DEFAULT_JEV_MIN_CONFIDENCE = 0.6;
+/** TypeSafe Choice の上限は 255。要件は常に 255 未満。 */
+export const MAX_JEV_CHOICES = 254;
+export const JEV_FETCH_TIMEOUT_MS = 8_000;
 
 function isTruthyEnv(value: string | undefined): boolean {
   const normalized = value?.trim().toLowerCase();
@@ -61,4 +64,8 @@ export function isJevConfidenceHigh(
   minConfidence = getJevMinConfidence(),
 ): boolean {
   return Number.isFinite(confidence) && confidence >= minConfidence;
+}
+
+export function isWithinJevChoiceLimit(count: number): boolean {
+  return count > 0 && count <= MAX_JEV_CHOICES;
 }

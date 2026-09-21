@@ -22,6 +22,10 @@ describe("account item buckets", () => {
     expect(assignAccountItemBucketKey("会議費")).toBe("meeting");
     expect(assignAccountItemBucketKey("雑費")).toBe(OTHER_BUCKET_KEY);
     expect(assignAccountItemBucketKey("普通預金")).toBe("assets");
+    expect(assignAccountItemBucketKey("売上高")).toBe("sales");
+    expect(assignAccountItemBucketKey("売上原価")).toBe("cogs");
+    expect(assignAccountItemBucketKey("受取手数料")).toBe("sales");
+    expect(assignAccountItemBucketKey("支払手数料")).toBe("fees");
   });
 
   it("omits empty buckets and keeps populated ones under the Choice cap", () => {

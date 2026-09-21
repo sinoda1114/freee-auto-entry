@@ -1,7 +1,7 @@
 import type { AccountItem } from "@/lib/freee/accounting";
+import { MAX_JEV_CHOICES } from "./jev-config";
 
-/** TypeSafe Choice の上限は 255。要件は常に 255 未満。 */
-export const MAX_JEV_CHOICES = 254;
+export { MAX_JEV_CHOICES, isWithinJevChoiceLimit } from "./jev-config";
 
 export const OTHER_BUCKET_KEY = "other";
 export const OTHER_BUCKET_LABEL = "その他";
@@ -20,14 +20,14 @@ interface BucketDef {
 
 const BUCKET_DEFS: readonly BucketDef[] = [
   {
-    key: "sales",
-    label: "売上・収益",
-    pattern: /売上|雑収入|受取利息|受取配当|営業外収益/,
-  },
-  {
     key: "cogs",
     label: "仕入・原価",
     pattern: /仕入|売上原価|製造原価/,
+  },
+  {
+    key: "sales",
+    label: "売上・収益",
+    pattern: /売上|雑収入|受取利息|受取配当|受取手数料|営業外収益/,
   },
   {
     key: "payroll",
@@ -212,10 +212,6 @@ export function buildAccountItemBuckets(
   }
 
   return buckets;
-}
-
-export function isWithinJevChoiceLimit(count: number): boolean {
-  return count > 0 && count <= MAX_JEV_CHOICES;
 }
 
 export function accountItemChoiceKey(item: AccountItem): string {

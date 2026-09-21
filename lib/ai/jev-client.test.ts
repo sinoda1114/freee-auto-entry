@@ -70,6 +70,7 @@ describe("runJevChoice", () => {
     expect(init.headers).toMatchObject({
       Authorization: "Bearer secret-key",
     });
+    expect(init.signal).toBeDefined();
     const body = JSON.parse(String(init.body));
     expect(body.questions.account_bucket.type).toBe("choice");
     expect(Object.keys(body.questions.account_bucket.criteria)).toHaveLength(2);

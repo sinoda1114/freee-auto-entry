@@ -6,8 +6,7 @@ import {
 import type { CreateMatcherCondition, EntrySide } from "@/lib/freee/wallet";
 import { generateGeminiJson } from "./gemini";
 import {
-  formatJevMatcherReasoning,
-  jevClassificationToTaxName,
+  matcherSuggestionFromJev,
   tryClassifyAccountItemWithJev,
 } from "./jev-account-choice";
 
@@ -278,39 +277,36 @@ async function collectJevBatchRules(
   rules: MatcherBatchLlmRule[];
   remaining: MatcherBatchLlmTransaction[];
 }> {
+  const classified = await Promise.all(
+    groupTransactionsForJev(transactions).map(async (group) => {
+      const sample = group[0];
+      if (!sample) {
+        return { group, suggestion: null };
+      }
+      const classification = await tryClassifyAccountItemWithJev(
+        sample,
+        accountItems,
+      );
+      const suggestion = classification
+        ? matcherSuggestionFromJev(classification, accountItems, taxCodes)
+        : null;
+      return { group, suggestion };
+    }),
+  );
+
   const remaining: MatcherBatchLlmTransaction[] = [];
   const rules: MatcherBatchLlmRule[] = [];
 
-  for (const group of groupTransactionsForJev(transactions)) {
-    if (rules.length >= MAX_BATCH_LLM_RULES) {
-      remaining.push(...group);
-      continue;
-    }
-
+  for (const { group, suggestion } of classified) {
     const sample = group[0];
-    if (!sample) {
-      continue;
-    }
-
-    const classification = await tryClassifyAccountItemWithJev(
-      sample,
-      accountItems,
-    );
-    const taxName = classification
-      ? jevClassificationToTaxName(classification, accountItems, taxCodes)
-      : undefined;
-    if (!classification || !taxName) {
+    if (!sample || !suggestion || rules.length >= MAX_BATCH_LLM_RULES) {
       remaining.push(...group);
       continue;
     }
-
     rules.push({
+      ...suggestion,
       description: sample.description,
-      condition: 0,
-      accountItemName: classification.accountItemName,
-      taxName,
       entrySide: sample.entrySide,
-      reasoning: formatJevMatcherReasoning(classification),
       transactionIds: group.map((item) => item.id),
     });
   }
@@ -337,12 +333,8 @@ export async function suggestBatchMatcherRulesWithLlm(
     accountItems,
     taxCodes,
   );
-  if (jevResult.remaining.length === 0) {
-    return jevResult.rules;
-  }
-
   const remainingSlots = MAX_BATCH_LLM_RULES - jevResult.rules.length;
-  if (remainingSlots <= 0) {
+  if (jevResult.remaining.length === 0 || remainingSlots <= 0) {
     return jevResult.rules;
   }
 
@@ -352,7 +344,7 @@ export async function suggestBatchMatcherRulesWithLlm(
       accountItems,
       taxCodes,
     );
-    return [...jevResult.rules, ...geminiRules].slice(0, MAX_BATCH_LLM_RULES);
+    return [...jevResult.rules, ...geminiRules.slice(0, remainingSlots)];
   } catch (error) {
     if (jevResult.rules.length > 0) {
       return jevResult.rules;

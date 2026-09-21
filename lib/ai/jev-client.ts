@@ -1,8 +1,11 @@
 import {
+  getJevApiKey,
+  getJevBaseUrl,
+  getJevModel,
   isWithinJevChoiceLimit,
+  JEV_FETCH_TIMEOUT_MS,
   MAX_JEV_CHOICES,
-} from "./account-item-buckets";
-import { getJevApiKey, getJevBaseUrl, getJevModel } from "./jev-config";
+} from "./jev-config";
 
 export class JevApiError extends Error {
   constructor(
@@ -81,24 +84,36 @@ export async function runJevChoice(
     );
   }
 
-  const response = await fetch(getJevBaseUrl(), {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: getJevModel(),
-      state: request.state,
-      questions: {
-        [request.questionId]: {
-          type: "choice",
-          instructions: request.instructions,
-          criteria: request.criteria,
-        },
+  let response: Response;
+  try {
+    response = await fetch(getJevBaseUrl(), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
-    }),
-  });
+      body: JSON.stringify({
+        model: getJevModel(),
+        state: request.state,
+        questions: {
+          [request.questionId]: {
+            type: "choice",
+            instructions: request.instructions,
+            criteria: request.criteria,
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(JEV_FETCH_TIMEOUT_MS),
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError")
+    ) {
+      throw new JevApiError("JEV API request timed out.");
+    }
+    throw error;
+  }
 
   let payload: unknown;
   try {

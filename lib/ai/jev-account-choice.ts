@@ -10,15 +10,16 @@ import {
   isWithinJevChoiceLimit,
   type AccountItemBucket,
 } from "./account-item-buckets";
-import { runJevChoice, type JevChoiceAnswer } from "./jev-client";
+import {
+  runJevChoice,
+  type JevChoiceAnswer,
+  type JevChoiceRequest,
+} from "./jev-client";
 import { isJevConfidenceHigh, isJevEnabled } from "./jev-config";
 
-export type JevChooseFn = (request: {
-  state: string;
-  questionId: string;
-  instructions: string;
-  criteria: Record<string, string>;
-}) => Promise<JevChoiceAnswer>;
+export type JevChooseFn = (
+  request: JevChoiceRequest,
+) => Promise<JevChoiceAnswer>;
 
 export interface JevAccountChoiceInput {
   description: string;
@@ -33,6 +34,13 @@ export interface JevAccountClassification {
   bucketLabel: string;
   l1Confidence: number;
   l2Confidence: number;
+}
+
+export interface JevMatcherSuggestionFields {
+  accountItemName: string;
+  taxName: string;
+  condition: 0;
+  reasoning: string;
 }
 
 const SKIPPED_STAGE_CONFIDENCE = 1;
@@ -53,6 +61,27 @@ export function formatJevMatcherReasoning(
   result: JevAccountClassification,
 ): string {
   return `摘要から「${result.bucketLabel}」の「${result.accountItemName}」を選びました。`;
+}
+
+export function matcherSuggestionFromJev(
+  classification: JevAccountClassification,
+  accountItems: AccountItem[],
+  taxCodes: TaxCode[],
+): JevMatcherSuggestionFields | null {
+  const taxName = resolveTaxNameForAccountItem(
+    classification.accountItemName,
+    accountItems,
+    taxCodes,
+  );
+  if (!taxName) {
+    return null;
+  }
+  return {
+    accountItemName: classification.accountItemName,
+    taxName,
+    condition: 0,
+    reasoning: formatJevMatcherReasoning(classification),
+  };
 }
 
 function bucketCriteria(buckets: AccountItemBucket[]): Record<string, string> {
@@ -91,6 +120,34 @@ function findItemByChoiceKey(
   return items.find((item) => accountItemChoiceKey(item) === choiceKey);
 }
 
+async function chooseAmong<T>(
+  candidates: T[],
+  params: {
+    choose: JevChooseFn;
+    request: JevChoiceRequest;
+    find: (choice: string) => T | undefined;
+    minConfidence?: number;
+  },
+): Promise<{ selected: T; confidence: number } | null> {
+  if (!isWithinJevChoiceLimit(candidates.length)) {
+    return null;
+  }
+  const only = candidates[0];
+  if (candidates.length === 1 && only) {
+    return { selected: only, confidence: SKIPPED_STAGE_CONFIDENCE };
+  }
+
+  const answer = await params.choose(params.request);
+  if (!isJevConfidenceHigh(answer.confidence, params.minConfidence)) {
+    return null;
+  }
+  const matched = params.find(answer.choice);
+  if (!matched) {
+    return null;
+  }
+  return { selected: matched, confidence: answer.confidence };
+}
+
 export async function classifyAccountItemWithJev(
   input: JevAccountChoiceInput,
   accountItems: AccountItem[],
@@ -100,70 +157,45 @@ export async function classifyAccountItemWithJev(
   },
 ): Promise<JevAccountClassification | null> {
   const buckets = buildAccountItemBuckets(accountItems);
-  if (!isWithinJevChoiceLimit(buckets.length)) {
-    return null;
-  }
-
   const state = buildJevClassificationState(input);
-  const minConfidence = options.minConfidence;
 
-  let selectedBucket = buckets[0];
-  let l1Confidence = SKIPPED_STAGE_CONFIDENCE;
-
-  if (buckets.length > 1) {
-    const l1 = await options.choose({
+  const l1 = await chooseAmong(buckets, {
+    choose: options.choose,
+    minConfidence: options.minConfidence,
+    request: {
       state,
       questionId: "account_bucket",
       instructions:
         "この取引に最も合う勘定科目の大分類を1つ選んでください。",
       criteria: bucketCriteria(buckets),
-    });
-    if (!isJevConfidenceHigh(l1.confidence, minConfidence)) {
-      return null;
-    }
-    const matched = findBucket(buckets, l1.choice);
-    if (!matched) {
-      return null;
-    }
-    selectedBucket = matched;
-    l1Confidence = l1.confidence;
-  }
-
-  if (!selectedBucket || !isWithinJevChoiceLimit(selectedBucket.items.length)) {
+    },
+    find: (choice) => findBucket(buckets, choice),
+  });
+  if (!l1) {
     return null;
   }
 
-  let selectedItem = selectedBucket.items[0];
-  let l2Confidence = SKIPPED_STAGE_CONFIDENCE;
-
-  if (selectedBucket.items.length > 1) {
-    const l2 = await options.choose({
+  const l2 = await chooseAmong(l1.selected.items, {
+    choose: options.choose,
+    minConfidence: options.minConfidence,
+    request: {
       state,
       questionId: "account_item",
-      instructions: `大分類「${selectedBucket.label}」の中で、この取引に最も合う勘定科目を1つ選んでください。`,
-      criteria: itemCriteria(selectedBucket.items),
-    });
-    if (!isJevConfidenceHigh(l2.confidence, minConfidence)) {
-      return null;
-    }
-    const matched = findItemByChoiceKey(selectedBucket.items, l2.choice);
-    if (!matched) {
-      return null;
-    }
-    selectedItem = matched;
-    l2Confidence = l2.confidence;
-  }
-
-  if (!selectedItem) {
+      instructions: `大分類「${l1.selected.label}」の中で、この取引に最も合う勘定科目を1つ選んでください。`,
+      criteria: itemCriteria(l1.selected.items),
+    },
+    find: (choice) => findItemByChoiceKey(l1.selected.items, choice),
+  });
+  if (!l2) {
     return null;
   }
 
   return {
-    accountItemName: selectedItem.name,
-    bucketKey: selectedBucket.key,
-    bucketLabel: selectedBucket.label,
-    l1Confidence,
-    l2Confidence,
+    accountItemName: l2.selected.name,
+    bucketKey: l1.selected.key,
+    bucketLabel: l1.selected.label,
+    l1Confidence: l1.confidence,
+    l2Confidence: l2.confidence,
   };
 }
 
@@ -184,16 +216,4 @@ export async function tryClassifyAccountItemWithJev(
     });
     return null;
   }
-}
-
-export function jevClassificationToTaxName(
-  classification: JevAccountClassification,
-  accountItems: AccountItem[],
-  taxCodes: TaxCode[],
-): string | undefined {
-  return resolveTaxNameForAccountItem(
-    classification.accountItemName,
-    accountItems,
-    taxCodes,
-  );
 }
