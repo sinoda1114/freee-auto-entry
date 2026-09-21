@@ -5,6 +5,12 @@ import {
 } from "@/lib/freee/accounting";
 import type { CreateMatcherCondition, EntrySide } from "@/lib/freee/wallet";
 import { generateGeminiJson } from "./gemini";
+import {
+  formatJevMatcherReasoning,
+  jevClassificationToTaxName,
+  tryClassifyAccountItemWithJev,
+  type JevAccountClassification,
+} from "./jev-account-choice";
 
 export const MAX_LLM_CANDIDATES = 3;
 
@@ -213,7 +219,7 @@ export function validateMatcherLlmCandidates(
   return validated;
 }
 
-export async function suggestMatcherFieldsWithLlm(
+export async function suggestMatcherFieldsWithGemini(
   input: MatcherLlmInput,
   accountItems: AccountItem[],
   taxCodes: TaxCode[],
@@ -233,4 +239,48 @@ export async function suggestMatcherFieldsWithLlm(
   }
 
   return candidates;
+}
+
+function suggestionFromJev(
+  classification: JevAccountClassification,
+  accountItems: AccountItem[],
+  taxCodes: TaxCode[],
+): MatcherLlmSuggestion | null {
+  const taxName = jevClassificationToTaxName(
+    classification,
+    accountItems,
+    taxCodes,
+  );
+  if (!taxName) {
+    return null;
+  }
+  return {
+    accountItemName: classification.accountItemName,
+    taxName,
+    condition: 0,
+    reasoning: formatJevMatcherReasoning(classification),
+  };
+}
+
+export async function suggestMatcherFieldsWithLlm(
+  input: MatcherLlmInput,
+  accountItems: AccountItem[],
+  taxCodes: TaxCode[],
+): Promise<MatcherLlmSuggestion[]> {
+  const classification = await tryClassifyAccountItemWithJev(
+    input,
+    accountItems,
+  );
+  if (classification) {
+    const jevSuggestion = suggestionFromJev(
+      classification,
+      accountItems,
+      taxCodes,
+    );
+    if (jevSuggestion) {
+      return [jevSuggestion];
+    }
+  }
+
+  return suggestMatcherFieldsWithGemini(input, accountItems, taxCodes);
 }

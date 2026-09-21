@@ -5,6 +5,11 @@ import {
 } from "@/lib/freee/accounting";
 import type { CreateMatcherCondition, EntrySide } from "@/lib/freee/wallet";
 import { generateGeminiJson } from "./gemini";
+import {
+  formatJevMatcherReasoning,
+  jevClassificationToTaxName,
+  tryClassifyAccountItemWithJev,
+} from "./jev-account-choice";
 
 export const MAX_BATCH_LLM_RULES = 10;
 export const MAX_BATCH_LLM_TRANSACTIONS = 20;
@@ -222,20 +227,11 @@ export function validateMatcherBatchLlmRules(
   return validated;
 }
 
-export async function suggestBatchMatcherRulesWithLlm(
+export async function suggestBatchMatcherRulesWithGemini(
   transactions: MatcherBatchLlmTransaction[],
   accountItems: AccountItem[],
   taxCodes: TaxCode[],
 ): Promise<MatcherBatchLlmRule[]> {
-  if (transactions.length === 0) {
-    throw new Error("提案対象の明細がありません。");
-  }
-  if (transactions.length > MAX_BATCH_LLM_TRANSACTIONS) {
-    throw new Error(
-      `AI提案は一度に${MAX_BATCH_LLM_TRANSACTIONS}件までです。`,
-    );
-  }
-
   const prompt = buildMatcherBatchLlmPrompt(
     transactions,
     accountItems,
@@ -256,6 +252,113 @@ export async function suggestBatchMatcherRulesWithLlm(
   }
 
   return rules;
+}
+
+function groupTransactionsForJev(
+  transactions: MatcherBatchLlmTransaction[],
+): MatcherBatchLlmTransaction[][] {
+  const groups = new Map<string, MatcherBatchLlmTransaction[]>();
+  for (const transaction of transactions) {
+    const key = `${transaction.entrySide}\0${transaction.description}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.push(transaction);
+    } else {
+      groups.set(key, [transaction]);
+    }
+  }
+  return [...groups.values()];
+}
+
+async function collectJevBatchRules(
+  transactions: MatcherBatchLlmTransaction[],
+  accountItems: AccountItem[],
+  taxCodes: TaxCode[],
+): Promise<{
+  rules: MatcherBatchLlmRule[];
+  remaining: MatcherBatchLlmTransaction[];
+}> {
+  const remaining: MatcherBatchLlmTransaction[] = [];
+  const rules: MatcherBatchLlmRule[] = [];
+
+  for (const group of groupTransactionsForJev(transactions)) {
+    if (rules.length >= MAX_BATCH_LLM_RULES) {
+      remaining.push(...group);
+      continue;
+    }
+
+    const sample = group[0];
+    if (!sample) {
+      continue;
+    }
+
+    const classification = await tryClassifyAccountItemWithJev(
+      sample,
+      accountItems,
+    );
+    const taxName = classification
+      ? jevClassificationToTaxName(classification, accountItems, taxCodes)
+      : undefined;
+    if (!classification || !taxName) {
+      remaining.push(...group);
+      continue;
+    }
+
+    rules.push({
+      description: sample.description,
+      condition: 0,
+      accountItemName: classification.accountItemName,
+      taxName,
+      entrySide: sample.entrySide,
+      reasoning: formatJevMatcherReasoning(classification),
+      transactionIds: group.map((item) => item.id),
+    });
+  }
+
+  return { rules, remaining };
+}
+
+export async function suggestBatchMatcherRulesWithLlm(
+  transactions: MatcherBatchLlmTransaction[],
+  accountItems: AccountItem[],
+  taxCodes: TaxCode[],
+): Promise<MatcherBatchLlmRule[]> {
+  if (transactions.length === 0) {
+    throw new Error("提案対象の明細がありません。");
+  }
+  if (transactions.length > MAX_BATCH_LLM_TRANSACTIONS) {
+    throw new Error(
+      `AI提案は一度に${MAX_BATCH_LLM_TRANSACTIONS}件までです。`,
+    );
+  }
+
+  const jevResult = await collectJevBatchRules(
+    transactions,
+    accountItems,
+    taxCodes,
+  );
+  if (jevResult.remaining.length === 0) {
+    return jevResult.rules;
+  }
+
+  const remainingSlots = MAX_BATCH_LLM_RULES - jevResult.rules.length;
+  if (remainingSlots <= 0) {
+    return jevResult.rules;
+  }
+
+  try {
+    const geminiRules = await suggestBatchMatcherRulesWithGemini(
+      jevResult.remaining,
+      accountItems,
+      taxCodes,
+    );
+    return [...jevResult.rules, ...geminiRules].slice(0, MAX_BATCH_LLM_RULES);
+  } catch (error) {
+    if (jevResult.rules.length > 0) {
+      return jevResult.rules;
+    }
+    throw error;
+  }
 }
 
 export function batchLlmRulesToDrafts(
