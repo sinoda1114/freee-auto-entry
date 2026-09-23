@@ -16,10 +16,10 @@
     "postinstall": "node scripts/link-typescript6-for-eslint.mjs"
   },
   "dependencies": {
-    "@ai-sdk/google": "^2.0.0",
+    "@ai-sdk/google": "^4.0.24",
     "@heroui/react": "^2.8.5",
     "@libsql/client": "0.17.4",
-    "ai": "^5.0.0",
+    "ai": "^7.0.37",
     "framer-motion": "^12.23.24",
     "iron-session": "8.0.4",
     "next": "16.3.6",
