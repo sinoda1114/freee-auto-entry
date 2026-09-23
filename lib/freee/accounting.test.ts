@@ -134,6 +134,38 @@ describe("accounting API client", () => {
         description: "テスト経費",
       },
     ]);
+    expect(body.payments).toBeUndefined();
+  });
+
+  it("createDeal settles from the given walletable in the same request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ deal: { id: 44 } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createDeal(auth, {
+      issueDate: "2026-09-18",
+      accountItemId: 10,
+      taxCode: 1,
+      amount: 14280,
+      payment: {
+        date: "2026-09-18",
+        amount: 14280,
+        fromWalletableType: "private_account_item",
+        fromWalletableId: 88,
+      },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string);
+    expect(body.payments).toEqual([
+      {
+        date: "2026-09-18",
+        from_walletable_type: "private_account_item",
+        from_walletable_id: 88,
+        amount: 14280,
+      },
+    ]);
   });
 
   it("createDeal omits description when empty", async () => {

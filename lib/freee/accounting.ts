@@ -46,6 +46,17 @@ export interface CreateDealInput {
   description?: string;
   memoTagIds?: number[];
   receiptIds?: number[];
+  /** 同じリクエストで決済する。省略時は未決済のまま。 */
+  payment?: {
+    date: string;
+    fromWalletableType:
+      | "bank_account"
+      | "credit_card"
+      | "wallet"
+      | "private_account_item";
+    fromWalletableId: number;
+    amount: number;
+  };
 }
 
 async function freeeFetch(auth: FreeeAuth, path: string, init: RequestInit = {}) {
@@ -149,6 +160,18 @@ export async function createDeal(
         },
       ],
       ...(input.receiptIds ? { receipt_ids: input.receiptIds } : {}),
+      ...(input.payment
+        ? {
+            payments: [
+              {
+                date: input.payment.date,
+                from_walletable_type: input.payment.fromWalletableType,
+                from_walletable_id: input.payment.fromWalletableId,
+                amount: input.payment.amount,
+              },
+            ],
+          }
+        : {}),
     }),
   });
   return data.deal;

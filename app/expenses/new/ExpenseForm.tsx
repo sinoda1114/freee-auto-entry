@@ -281,7 +281,8 @@ export function ExpenseForm({
         setLastSuccessDealId(result.dealId);
         notifySuccess(
           "登録しました",
-          `取引ID: ${result.dealId}。続けて登録できます。`,
+          result.message ??
+            `取引ID: ${result.dealId}。役員資金で決済済みです。`,
         );
         resetFormFields();
         requestAnimationFrame(() => {
@@ -309,7 +310,7 @@ export function ExpenseForm({
             登録しました（取引ID: {lastSuccessDealId}）。
           </p>
           <p className="text-xs text-green-700/80 dark:text-green-300/80">
-            続けて登録できます。フォームは空に戻しています。
+            役員資金で決済済みです。続けて登録できます。フォームは空に戻しています。
           </p>
           <div className="flex flex-wrap gap-2">
             <Button

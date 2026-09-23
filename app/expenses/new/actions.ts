@@ -1,7 +1,12 @@
 "use server";
 
 import { extractReceiptOcr, type OcrResult } from "@/lib/ai/receipt-ocr";
-import { createDeal, getAccountItems, getTaxCodes } from "@/lib/freee/accounting";
+import {
+  createDeal,
+  getAccountItems,
+  getTaxCodes,
+} from "@/lib/freee/accounting";
+import { resolveOfficerFundsPayment } from "@/lib/expenses/officer-funds";
 import { getAppMemoTagId } from "@/lib/freee/memo-tag";
 import { uploadReceipt } from "@/lib/freee/receipts";
 import { getValidFreeeAuth } from "@/lib/freee/session-client";
@@ -85,7 +90,19 @@ export async function createExpenseAction(
   }
 
   try {
-    const memoTagId = await getAppMemoTagId(auth);
+    const [memoTagId, accountItems] = await Promise.all([
+      getAppMemoTagId(auth),
+      getAccountItems(auth),
+    ]);
+    const officerFunds = resolveOfficerFundsPayment(
+      accountItems,
+      issueDate,
+      amount,
+    );
+    if (!officerFunds.ok) {
+      return { status: "error", message: officerFunds.message };
+    }
+
     const deal = await createDeal(auth, {
       issueDate,
       accountItemId,
@@ -94,8 +111,14 @@ export async function createExpenseAction(
       ...(description.trim() ? { description: description.trim() } : {}),
       memoTagIds: memoTagId ? [memoTagId] : undefined,
       receiptIds,
+      payment: officerFunds.payment,
     });
-    return { status: "success", dealId: deal.id };
+
+    return {
+      status: "success",
+      dealId: deal.id,
+      message: "役員資金で決済まで登録しました。",
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "不明なエラーです。";
     return { status: "error", message };
