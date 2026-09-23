@@ -88,22 +88,6 @@ describe("accounting API client", () => {
     expect(url).toContain("company_id=999");
   });
 
-  it("getWalletables keeps a known account type", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          walletables: [{ id: 30, name: "役員資金", type: "wallet" }],
-        }),
-      }),
-    );
-
-    await expect(getWalletables(auth)).resolves.toEqual([
-      { id: 30, name: "役員資金", type: "wallet" },
-    ]);
-  });
-
   it("getPartners fetches business partners for the company", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -168,8 +152,8 @@ describe("accounting API client", () => {
       payment: {
         date: "2026-09-18",
         amount: 14280,
-        fromWalletableType: "wallet",
-        fromWalletableId: 30,
+        fromWalletableType: "private_account_item",
+        fromWalletableId: 88,
       },
     });
 
@@ -177,8 +161,8 @@ describe("accounting API client", () => {
     expect(body.payments).toEqual([
       {
         date: "2026-09-18",
-        from_walletable_type: "wallet",
-        from_walletable_id: 30,
+        from_walletable_type: "private_account_item",
+        from_walletable_id: 88,
         amount: 14280,
       },
     ]);

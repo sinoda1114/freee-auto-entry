@@ -260,11 +260,11 @@ export function SuicaExpenseView({
           dealIds: allDealIds,
           registeredCount: allDealIds.length,
           skippedDuplicateCount: skippedDuplicates,
-          message: `${allDealIds.length}件の経費を登録しました。${skipNote}`,
+          message: `${allDealIds.length}件を役員資金で決済まで登録しました。${skipNote}`,
         });
         notifySuccess(
           "Suica経費を登録しました",
-          `${allDealIds.length}件の経費を登録しました。${skipNote}`,
+          `${allDealIds.length}件を役員資金で決済まで登録しました。${skipNote}`,
         );
         setSelected(new Set());
         // 登録後は指紋が増えるので再照合
@@ -302,7 +302,7 @@ export function SuicaExpenseView({
         </p>
         <p className="text-xs text-[var(--freee-text-muted)]">
           Suica 読取アプリや会員サイトなどから書き出した CSV
-          を選んでください。すでに freee
+          を選んでください。登録と同時に役員資金で決済します。すでに freee
           にある明細（日付・金額・内容が同じ）は自動で除外します。
         </p>
         <input

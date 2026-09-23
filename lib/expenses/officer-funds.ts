@@ -1,35 +1,35 @@
-import type { Walletable, WalletableAccountType } from "@/lib/freee/accounting";
+import type { AccountItem, CreateDealInput } from "@/lib/freee/accounting";
 
-export const OFFICER_FUNDS_WALLETABLE_NAME = "役員資金";
+/** freee の決済画面に出る「役員資金」。API では勘定科目「役員借入金」を private_account_item で渡す。 */
+export const OFFICER_BORROWING_ACCOUNT_ITEM_NAME = "役員借入金";
 
-export type OfficerFundsLookup =
-  | {
-      status: "found";
-      id: number;
-      type: WalletableAccountType;
-    }
-  | { status: "missing" }
-  | { status: "untyped" };
+export const OFFICER_FUNDS_MISSING_MESSAGE =
+  "freeeに勘定科目「役員借入金」がないため、登録を止めています。役員資金での決済にこの科目を使います。";
 
-function isWalletableAccountType(
-  value: Walletable["type"],
-): value is WalletableAccountType {
-  return (
-    value === "bank_account" || value === "credit_card" || value === "wallet"
-  );
-}
+type DealPayment = NonNullable<CreateDealInput["payment"]>;
 
-export function findOfficerFundsWalletable(
-  walletables: Walletable[],
-): OfficerFundsLookup {
-  const found = walletables.find(
-    (item) => item.name.trim() === OFFICER_FUNDS_WALLETABLE_NAME,
+export type OfficerFundsPaymentResult =
+  | { ok: true; payment: DealPayment }
+  | { ok: false; message: string };
+
+export function resolveOfficerFundsPayment(
+  accountItems: AccountItem[],
+  date: string,
+  amount: number,
+): OfficerFundsPaymentResult {
+  const found = accountItems.find(
+    (item) => item.name.trim() === OFFICER_BORROWING_ACCOUNT_ITEM_NAME,
   );
   if (!found) {
-    return { status: "missing" };
+    return { ok: false, message: OFFICER_FUNDS_MISSING_MESSAGE };
   }
-  if (!isWalletableAccountType(found.type)) {
-    return { status: "untyped" };
-  }
-  return { status: "found", id: found.id, type: found.type };
+  return {
+    ok: true,
+    payment: {
+      date,
+      amount,
+      fromWalletableType: "private_account_item",
+      fromWalletableId: found.id,
+    },
+  };
 }

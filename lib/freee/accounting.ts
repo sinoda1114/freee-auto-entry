@@ -23,12 +23,9 @@ export interface TaxCode {
   name: string;
 }
 
-export type WalletableAccountType = "bank_account" | "credit_card" | "wallet";
-
 export interface Walletable {
   id: number;
   name: string;
-  type?: WalletableAccountType;
 }
 
 export interface Partner {
@@ -52,7 +49,11 @@ export interface CreateDealInput {
   /** 同じリクエストで決済する。省略時は未決済のまま。 */
   payment?: {
     date: string;
-    fromWalletableType: WalletableAccountType;
+    fromWalletableType:
+      | "bank_account"
+      | "credit_card"
+      | "wallet"
+      | "private_account_item";
     fromWalletableId: number;
     amount: number;
   };
@@ -121,14 +122,6 @@ export async function getTaxCodes(auth: FreeeAuth): Promise<TaxCode[]> {
     .map((tax) => ({ code: tax.code, name: tax.name_ja }));
 }
 
-function isWalletableAccountType(
-  value: unknown,
-): value is WalletableAccountType {
-  return (
-    value === "bank_account" || value === "credit_card" || value === "wallet"
-  );
-}
-
 export async function getWalletables(auth: FreeeAuth): Promise<Walletable[]> {
   if (isE2ETestMode()) {
     return e2eWalletables;
@@ -137,14 +130,7 @@ export async function getWalletables(auth: FreeeAuth): Promise<Walletable[]> {
     auth,
     `/walletables?company_id=${auth.companyId}`,
   );
-  return (data.walletables as Array<Record<string, unknown>>).map((item) => {
-    const type = item.type;
-    return {
-      id: Number(item.id),
-      name: String(item.name),
-      ...(isWalletableAccountType(type) ? { type } : {}),
-    };
-  });
+  return data.walletables;
 }
 
 export async function getPartners(auth: FreeeAuth): Promise<Partner[]> {

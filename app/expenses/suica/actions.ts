@@ -1,6 +1,7 @@
 "use server";
 
-import { createDeal } from "@/lib/freee/accounting";
+import { createDeal, getAccountItems } from "@/lib/freee/accounting";
+import { resolveOfficerFundsPayment } from "@/lib/expenses/officer-funds";
 import {
   formatDealCreateError,
   getCompanyFiscalYears,
@@ -207,7 +208,23 @@ export async function createSuicaExpensesAction(
 
   const dealIds: number[] = [];
   try {
-    const memoTagId = await getAppMemoTagId(auth);
+    const [memoTagId, accountItems] = await Promise.all([
+      getAppMemoTagId(auth),
+      getAccountItems(auth),
+    ]);
+    const officerFunds = resolveOfficerFundsPayment(
+      accountItems,
+      toCreate[0]?.date ?? "",
+      toCreate[0]?.amount ?? 0,
+    );
+    if (!officerFunds.ok) {
+      return {
+        status: "error",
+        message: officerFunds.message,
+        skippedDuplicateCount: totalSkipped,
+      };
+    }
+
     for (const item of toCreate) {
       const deal = await createDeal(auth, {
         issueDate: item.date,
@@ -216,6 +233,11 @@ export async function createSuicaExpensesAction(
         amount: item.amount,
         description: formatSuicaExpenseDescription(item),
         memoTagIds: memoTagId ? [memoTagId] : undefined,
+        payment: {
+          ...officerFunds.payment,
+          date: item.date,
+          amount: item.amount,
+        },
       });
       dealIds.push(deal.id);
       existing.add(fingerprintFromItem(item));
@@ -227,7 +249,7 @@ export async function createSuicaExpensesAction(
       dealIds,
       registeredCount: dealIds.length,
       skippedDuplicateCount: totalSkipped,
-      message: `${dealIds.length}件の経費を登録しました。${skipNote}`,
+      message: `${dealIds.length}件を役員資金で決済まで登録しました。${skipNote}`,
     };
   } catch (error) {
     const raw = error instanceof Error ? error.message : "不明なエラーです。";

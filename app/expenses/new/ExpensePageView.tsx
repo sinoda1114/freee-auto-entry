@@ -41,7 +41,7 @@ export function ExpensePageView({
         >
           Suica経費登録
         </NextLink>
-        で CSV 取り込み（または Android でかざし）できます。
+        で CSV 取り込み（または Android でかざし）できます。こちらも役員資金で決済します。
       </p>
       <div className="panel mt-4 px-4 py-4">
         <ExpenseForm

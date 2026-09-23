@@ -1,24 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { findOfficerFundsWalletable } from "./officer-funds";
+import { resolveOfficerFundsPayment } from "./officer-funds";
 
-describe("findOfficerFundsWalletable", () => {
-  it("returns the officer funds account", () => {
-    expect(
-      findOfficerFundsWalletable([
-        { id: 1, name: "普通預金", type: "bank_account" },
-        { id: 30, name: " 役員資金 ", type: "wallet" },
-      ]),
-    ).toEqual({ status: "found", id: 30, type: "wallet" });
+const items = [
+  { id: 1, name: "旅費交通費", defaultTaxCode: 136 },
+  { id: 88, name: " 役員借入金 ", defaultTaxCode: 0 },
+];
+
+describe("resolveOfficerFundsPayment", () => {
+  it("builds a private-account payment for the full amount", () => {
+    expect(resolveOfficerFundsPayment(items, "2026-09-18", 14280)).toEqual({
+      ok: true,
+      payment: {
+        date: "2026-09-18",
+        amount: 14280,
+        fromWalletableType: "private_account_item",
+        fromWalletableId: 88,
+      },
+    });
   });
 
-  it("reports a missing account and a missing type separately", () => {
-    expect(
-      findOfficerFundsWalletable([
-        { id: 1, name: "法人カード", type: "credit_card" },
-      ]),
-    ).toEqual({ status: "missing" });
-    expect(
-      findOfficerFundsWalletable([{ id: 30, name: "役員資金" }]),
-    ).toEqual({ status: "untyped" });
+  it("stops when the officer borrowing account is missing", () => {
+    const result = resolveOfficerFundsPayment(
+      [{ id: 1, name: "旅費交通費", defaultTaxCode: 136 }],
+      "2026-09-18",
+      1000,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toContain("役員借入金");
+    }
   });
 });
