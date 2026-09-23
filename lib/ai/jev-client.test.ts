@@ -76,6 +76,29 @@ describe("runJevChoice", () => {
     expect(Object.keys(body.questions.account_bucket.criteria)).toHaveLength(2);
   });
 
+  it("reports HTTP status before treating an error body as success JSON", async () => {
+    vi.stubEnv("JEV_API_KEY", "secret-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: async () => {
+          throw new SyntaxError("not json");
+        },
+      }),
+    );
+
+    await expect(
+      runJevChoice({
+        state: "x",
+        questionId: "account_bucket",
+        instructions: "選ぶ",
+        criteria: { travel: "旅費交通費" },
+      }),
+    ).rejects.toThrow("JEV API request failed: 502");
+  });
+
   it("rejects Choice lists over the 255-less cap", async () => {
     vi.stubEnv("JEV_API_KEY", "secret-key");
     const criteria: Record<string, string> = {};

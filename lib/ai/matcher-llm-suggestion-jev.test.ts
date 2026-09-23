@@ -188,4 +188,27 @@ describe("suggestBatchMatcherRulesWithLlm JEV gate", () => {
     expect(rules).toHaveLength(1);
     expect(rules[0]?.accountItemName).toBe("通信費");
   });
+
+  it("refuses a partial JEV result when the rule budget is already full", async () => {
+    vi.mocked(tryClassifyAccountItemWithJev).mockImplementation(async () => ({
+      accountItemName: "通信費",
+      bucketKey: "comms",
+      bucketLabel: "通信費",
+      l1Confidence: 0.9,
+      l2Confidence: 0.9,
+    }));
+
+    const transactions = Array.from({ length: 11 }, (_, index) => ({
+      id: index + 1,
+      description: `明細${index + 1}`,
+      amount: -100,
+      entrySide: "expense" as const,
+      walletableName: "法人カード",
+    }));
+
+    await expect(
+      suggestBatchMatcherRulesWithLlm(transactions, accountItems, taxCodes),
+    ).rejects.toThrow("一度に10件のルールまで");
+    expect(generateGeminiJson).not.toHaveBeenCalled();
+  });
 });

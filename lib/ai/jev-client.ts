@@ -115,18 +115,31 @@ export async function runJevChoice(
     throw error;
   }
 
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const errorPayload: unknown = await response.json();
+      if (
+        isRecord(errorPayload) &&
+        "error" in errorPayload &&
+        errorPayload.error != null
+      ) {
+        detail = ` - ${String(errorPayload.error)}`;
+      }
+    } catch {
+      // HTML などの非 JSON エラーはステータスだけ返す。
+    }
+    throw new JevApiError(
+      `JEV API request failed: ${response.status}${detail}`,
+      response.status,
+    );
+  }
+
   let payload: unknown;
   try {
     payload = await response.json();
   } catch {
     throw new JevApiError("JEV API が不正な JSON を返しました。", response.status);
-  }
-
-  if (!response.ok) {
-    throw new JevApiError(
-      `JEV API request failed: ${response.status}`,
-      response.status,
-    );
   }
 
   const answer = parseJevChoiceAnswer(payload, request.questionId);

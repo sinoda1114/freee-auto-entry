@@ -265,6 +265,7 @@ function groupTransactionsForJev(
 ): MatcherBatchLlmTransaction[][] {
   const groups = new Map<string, MatcherBatchLlmTransaction[]>();
   for (const transaction of transactions) {
+    // freee の自動登録ルールは摘要と収支で一致する。金額や口座では分かれない。
     const key = `${transaction.entrySide}\0${transaction.description}`;
     const existing = groups.get(key);
     if (existing) {
@@ -341,8 +342,13 @@ export async function suggestBatchMatcherRulesWithLlm(
     taxCodes,
   );
   const remainingSlots = MAX_BATCH_LLM_RULES - jevResult.rules.length;
-  if (jevResult.remaining.length === 0 || remainingSlots <= 0) {
+  if (jevResult.remaining.length === 0) {
     return jevResult.rules;
+  }
+  if (remainingSlots <= 0) {
+    throw new Error(
+      `AI提案は一度に${MAX_BATCH_LLM_RULES}件のルールまでです。対象を減らして再実行してください。`,
+    );
   }
 
   try {
