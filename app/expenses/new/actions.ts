@@ -1,7 +1,13 @@
 "use server";
 
 import { extractReceiptOcr, type OcrResult } from "@/lib/ai/receipt-ocr";
-import { createDeal, getAccountItems, getTaxCodes } from "@/lib/freee/accounting";
+import {
+  createDeal,
+  getAccountItems,
+  getTaxCodes,
+  getWalletables,
+} from "@/lib/freee/accounting";
+import { findOfficerFundsWalletable } from "@/lib/expenses/officer-funds";
 import { getAppMemoTagId } from "@/lib/freee/memo-tag";
 import { uploadReceipt } from "@/lib/freee/receipts";
 import { getValidFreeeAuth } from "@/lib/freee/session-client";
@@ -85,7 +91,26 @@ export async function createExpenseAction(
   }
 
   try {
-    const memoTagId = await getAppMemoTagId(auth);
+    const [memoTagId, walletables] = await Promise.all([
+      getAppMemoTagId(auth),
+      getWalletables(auth),
+    ]);
+    const officerFunds = findOfficerFundsWalletable(walletables);
+    if (officerFunds.status === "missing") {
+      return {
+        status: "error",
+        message:
+          "freeeに口座「役員資金」がないため、登録を止めています。口座名を確認してください。",
+      };
+    }
+    if (officerFunds.status === "untyped") {
+      return {
+        status: "error",
+        message:
+          "口座「役員資金」の種別をfreeeから取得できなかったため、登録を止めています。",
+      };
+    }
+
     const deal = await createDeal(auth, {
       issueDate,
       accountItemId,
@@ -94,8 +119,19 @@ export async function createExpenseAction(
       ...(description.trim() ? { description: description.trim() } : {}),
       memoTagIds: memoTagId ? [memoTagId] : undefined,
       receiptIds,
+      payment: {
+        date: issueDate,
+        amount,
+        fromWalletableType: officerFunds.type,
+        fromWalletableId: officerFunds.id,
+      },
     });
-    return { status: "success", dealId: deal.id };
+
+    return {
+      status: "success",
+      dealId: deal.id,
+      message: "役員資金で決済まで登録しました。",
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : "不明なエラーです。";
     return { status: "error", message };

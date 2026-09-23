@@ -88,6 +88,22 @@ describe("accounting API client", () => {
     expect(url).toContain("company_id=999");
   });
 
+  it("getWalletables keeps a known account type", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          walletables: [{ id: 30, name: "役員資金", type: "wallet" }],
+        }),
+      }),
+    );
+
+    await expect(getWalletables(auth)).resolves.toEqual([
+      { id: 30, name: "役員資金", type: "wallet" },
+    ]);
+  });
+
   it("getPartners fetches business partners for the company", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -132,6 +148,38 @@ describe("accounting API client", () => {
         tax_code: 1,
         amount: 5000,
         description: "テスト経費",
+      },
+    ]);
+    expect(body.payments).toBeUndefined();
+  });
+
+  it("createDeal settles from the given walletable in the same request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ deal: { id: 44 } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createDeal(auth, {
+      issueDate: "2026-09-18",
+      accountItemId: 10,
+      taxCode: 1,
+      amount: 14280,
+      payment: {
+        date: "2026-09-18",
+        amount: 14280,
+        fromWalletableType: "wallet",
+        fromWalletableId: 30,
+      },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string);
+    expect(body.payments).toEqual([
+      {
+        date: "2026-09-18",
+        from_walletable_type: "wallet",
+        from_walletable_id: 30,
+        amount: 14280,
       },
     ]);
   });

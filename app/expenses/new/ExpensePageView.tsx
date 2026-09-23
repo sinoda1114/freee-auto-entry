@@ -31,7 +31,7 @@ export function ExpensePageView({
       </Button>
       <PageHeader
         title="経費を登録"
-        description="領収書をカメラ撮影または選択すると OCR で自動入力し、freee 会計へ登録します。"
+        description="領収書をカメラ撮影または選択すると OCR で自動入力し、freee 会計へ登録します。登録と同時に、出金元口座は役員資金で決済します。"
       />
       <p className="mt-3 text-sm text-[var(--freee-text-muted)]">
         Suica の履歴は{" "}

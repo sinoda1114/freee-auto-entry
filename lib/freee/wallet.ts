@@ -1,4 +1,4 @@
-import type { FreeeAuth } from "./accounting";
+import type { FreeeAuth, WalletableAccountType } from "./accounting";
 import {
   e2eUserMatchers,
   e2eWalletTransactions,
@@ -9,7 +9,7 @@ import {
 const ACCOUNTING_API_BASE = "https://api.freee.co.jp/api/1";
 
 export type EntrySide = "income" | "expense";
-export type WalletableType = "bank_account" | "credit_card" | "wallet";
+export type WalletableType = WalletableAccountType;
 export type MatcherCondition = 0 | 1 | 2 | 3 | 4;
 export type CreateMatcherCondition = Exclude<MatcherCondition, 4>;
 
