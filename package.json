@@ -9,7 +9,7 @@
     "lint": "node scripts/link-typescript6-for-eslint.mjs && eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "node scripts/run-wallet-e2e.mjs",
+    "test:e2e": "playwright test",
     "test:e2e:wallet": "node scripts/run-wallet-e2e.mjs",
     "test:e2e:playwright": "playwright test",
     "test:suica-smoke": "node scripts/suica-smoke.mjs",
@@ -22,13 +22,13 @@
     "ai": "^5.0.0",
     "framer-motion": "^12.23.24",
     "iron-session": "8.0.4",
-    "next": "16.3.0-preview.6",
+    "next": "16.3.6",
     "next-themes": "^0.4.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "zod": "^4.0.0",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.51.1",
@@ -41,11 +41,22 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "6.0.3",
     "eslint": "^9",
-    "eslint-config-next": "16.3.0-preview.6",
+    "eslint-config-next": "16.3.6",
     "jsdom": "29.1.1",
     "tailwindcss": "^4",
     "typescript": "7.0.2",
     "typescript-6-eslint": "npm:typescript@6.0.3",
     "vitest": "4.1.10"
+  },
+  "overrides": {
+    "browserslist": "4.29.0",
+    "js-yaml": "4.3.2",
+    "undici": "7.29.1",
+    "minimatch@3": {
+      "brace-expansion": "1.1.21"
+    },
+    "minimatch@10": {
+      "brace-expansion": "5.0.12"
+    }
   }
 }
