@@ -45,6 +45,9 @@ test.describe("経費（領収書）E2E", () => {
       page.getByRole("heading", { name: "経費を登録" }),
     ).toBeVisible();
     await expect(page.getByText("領収書をカメラ撮影または選択すると")).toBeVisible();
+    await expect(
+      page.getByText("登録すると、出金元口座は役員資金で決済します。"),
+    ).toBeVisible();
     await expect(page.getByText("経費登録は対応事業所のみ利用できます")).toHaveCount(
       0,
     );

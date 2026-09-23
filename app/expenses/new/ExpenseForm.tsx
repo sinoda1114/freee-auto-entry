@@ -672,6 +672,9 @@ export function ExpenseForm({
         />
       </label>
 
+      <p className="text-sm font-medium text-[var(--freee-text)]">
+        登録すると、出金元口座は役員資金で決済します。
+      </p>
       <button
         type="submit"
         disabled={isPending || isOcrPending}
