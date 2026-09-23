@@ -16,7 +16,7 @@
     "postinstall": "node scripts/link-typescript6-for-eslint.mjs"
   },
   "dependencies": {
-    "@ai-sdk/google": "^2.0.0",
+    "@ai-sdk/google": "^4.0.26",
     "@heroui/react": "^2.8.5",
     "@libsql/client": "0.17.4",
     "ai": "^5.0.0",
