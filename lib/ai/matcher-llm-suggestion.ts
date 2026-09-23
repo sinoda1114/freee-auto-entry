@@ -5,6 +5,10 @@ import {
 } from "@/lib/freee/accounting";
 import type { CreateMatcherCondition, EntrySide } from "@/lib/freee/wallet";
 import { generateGeminiJson } from "./gemini";
+import {
+  matcherSuggestionFromJev,
+  tryClassifyAccountItemWithJev,
+} from "./jev-account-choice";
 
 export const MAX_LLM_CANDIDATES = 3;
 
@@ -213,7 +217,7 @@ export function validateMatcherLlmCandidates(
   return validated;
 }
 
-export async function suggestMatcherFieldsWithLlm(
+export async function suggestMatcherFieldsWithGemini(
   input: MatcherLlmInput,
   accountItems: AccountItem[],
   taxCodes: TaxCode[],
@@ -233,4 +237,27 @@ export async function suggestMatcherFieldsWithLlm(
   }
 
   return candidates;
+}
+
+export async function suggestMatcherFieldsWithLlm(
+  input: MatcherLlmInput,
+  accountItems: AccountItem[],
+  taxCodes: TaxCode[],
+): Promise<MatcherLlmSuggestion[]> {
+  const classification = await tryClassifyAccountItemWithJev(
+    input,
+    accountItems,
+  );
+  if (classification) {
+    const jevSuggestion = matcherSuggestionFromJev(
+      classification,
+      accountItems,
+      taxCodes,
+    );
+    if (jevSuggestion) {
+      return [jevSuggestion];
+    }
+  }
+
+  return suggestMatcherFieldsWithGemini(input, accountItems, taxCodes);
 }

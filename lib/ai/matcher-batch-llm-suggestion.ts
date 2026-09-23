@@ -5,6 +5,10 @@ import {
 } from "@/lib/freee/accounting";
 import type { CreateMatcherCondition, EntrySide } from "@/lib/freee/wallet";
 import { generateGeminiJson } from "./gemini";
+import {
+  matcherSuggestionFromJev,
+  tryClassifyAccountItemWithJev,
+} from "./jev-account-choice";
 
 export const MAX_BATCH_LLM_RULES = 10;
 export const MAX_BATCH_LLM_TRANSACTIONS = 20;
@@ -86,18 +90,20 @@ const RULE_SCHEMA = {
   ],
 } as const;
 
-const RESPONSE_SCHEMA = {
-  type: "object",
-  properties: {
-    rules: {
-      type: "array",
-      items: RULE_SCHEMA,
-      minItems: 1,
-      maxItems: MAX_BATCH_LLM_RULES,
+function batchResponseSchema(maxRules: number) {
+  return {
+    type: "object",
+    properties: {
+      rules: {
+        type: "array",
+        items: RULE_SCHEMA,
+        minItems: 1,
+        maxItems: maxRules,
+      },
     },
-  },
-  required: ["rules"],
-} as const;
+    required: ["rules"],
+  };
+}
 
 function parseCondition(value: unknown): CreateMatcherCondition | null {
   const condition = Number(value);
@@ -117,6 +123,7 @@ export function buildMatcherBatchLlmPrompt(
   transactions: MatcherBatchLlmTransaction[],
   accountItems: AccountItem[],
   taxCodes: TaxCode[],
+  maxRules = MAX_BATCH_LLM_RULES,
 ): string {
   const accountItemNames = accountItems.map((item) => item.name).join("\n- ");
   const taxNames = taxCodes.map((tax) => tax.name).join("\n- ");
@@ -127,7 +134,7 @@ export function buildMatcherBatchLlmPrompt(
 
   return [
     "You are a Japanese bookkeeping assistant for freee accounting software.",
-    `Propose up to ${MAX_BATCH_LLM_RULES} automatic wallet transaction registration rules for the selected unprocessed transactions.`,
+    `Propose up to ${maxRules} automatic wallet transaction registration rules for the selected unprocessed transactions.`,
     "Group similar transactions into one rule when appropriate (same merchant pattern, same account item).",
     "Return JSON only. accountItemName and taxName must exactly match provided options.",
     "Each rule must list transactionIds it covers. Every input transaction id must appear in exactly one rule.",
@@ -150,6 +157,7 @@ export function validateMatcherBatchLlmRules(
   transactions: MatcherBatchLlmTransaction[],
   accountItems: AccountItem[],
   taxCodes: TaxCode[],
+  maxRules = MAX_BATCH_LLM_RULES,
 ): MatcherBatchLlmRule[] {
   if (!Array.isArray(raw.rules)) {
     return [];
@@ -161,7 +169,7 @@ export function validateMatcherBatchLlmRules(
   const validated: MatcherBatchLlmRule[] = [];
 
   for (const rawRule of raw.rules) {
-    if (validated.length >= MAX_BATCH_LLM_RULES) {
+    if (validated.length >= maxRules) {
       break;
     }
     const rule = rawRule as RawBatchRule;
@@ -222,6 +230,98 @@ export function validateMatcherBatchLlmRules(
   return validated;
 }
 
+export async function suggestBatchMatcherRulesWithGemini(
+  transactions: MatcherBatchLlmTransaction[],
+  accountItems: AccountItem[],
+  taxCodes: TaxCode[],
+  maxRules = MAX_BATCH_LLM_RULES,
+): Promise<MatcherBatchLlmRule[]> {
+  const prompt = buildMatcherBatchLlmPrompt(
+    transactions,
+    accountItems,
+    taxCodes,
+    maxRules,
+  );
+  const raw = await generateGeminiJson<RawBatchResponse>(
+    prompt,
+    batchResponseSchema(maxRules),
+  );
+  const rules = validateMatcherBatchLlmRules(
+    raw,
+    transactions,
+    accountItems,
+    taxCodes,
+    maxRules,
+  );
+  if (rules.length === 0) {
+    throw new Error("AI提案をfreeeのマスタ一覧と照合できませんでした。");
+  }
+
+  return rules;
+}
+
+function groupTransactionsForJev(
+  transactions: MatcherBatchLlmTransaction[],
+): MatcherBatchLlmTransaction[][] {
+  const groups = new Map<string, MatcherBatchLlmTransaction[]>();
+  for (const transaction of transactions) {
+    // freee の自動登録ルールは摘要と収支で一致する。金額や口座では分かれない。
+    const key = `${transaction.entrySide}\0${transaction.description}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.push(transaction);
+    } else {
+      groups.set(key, [transaction]);
+    }
+  }
+  return [...groups.values()];
+}
+
+async function collectJevBatchRules(
+  transactions: MatcherBatchLlmTransaction[],
+  accountItems: AccountItem[],
+  taxCodes: TaxCode[],
+): Promise<{
+  rules: MatcherBatchLlmRule[];
+  remaining: MatcherBatchLlmTransaction[];
+}> {
+  const classified = await Promise.all(
+    groupTransactionsForJev(transactions).map(async (group) => {
+      const sample = group[0];
+      if (!sample) {
+        return { group, suggestion: null };
+      }
+      const classification = await tryClassifyAccountItemWithJev(
+        sample,
+        accountItems,
+      );
+      const suggestion = classification
+        ? matcherSuggestionFromJev(classification, accountItems, taxCodes)
+        : null;
+      return { group, suggestion };
+    }),
+  );
+
+  const remaining: MatcherBatchLlmTransaction[] = [];
+  const rules: MatcherBatchLlmRule[] = [];
+
+  for (const { group, suggestion } of classified) {
+    const sample = group[0];
+    if (!sample || !suggestion || rules.length >= MAX_BATCH_LLM_RULES) {
+      remaining.push(...group);
+      continue;
+    }
+    rules.push({
+      ...suggestion,
+      description: sample.description,
+      entrySide: sample.entrySide,
+      transactionIds: group.map((item) => item.id),
+    });
+  }
+
+  return { rules, remaining };
+}
+
 export async function suggestBatchMatcherRulesWithLlm(
   transactions: MatcherBatchLlmTransaction[],
   accountItems: AccountItem[],
@@ -236,26 +336,35 @@ export async function suggestBatchMatcherRulesWithLlm(
     );
   }
 
-  const prompt = buildMatcherBatchLlmPrompt(
+  const jevResult = await collectJevBatchRules(
     transactions,
     accountItems,
     taxCodes,
   );
-  const raw = await generateGeminiJson<RawBatchResponse>(
-    prompt,
-    RESPONSE_SCHEMA,
-  );
-  const rules = validateMatcherBatchLlmRules(
-    raw,
-    transactions,
-    accountItems,
-    taxCodes,
-  );
-  if (rules.length === 0) {
-    throw new Error("AI提案をfreeeのマスタ一覧と照合できませんでした。");
+  const remainingSlots = MAX_BATCH_LLM_RULES - jevResult.rules.length;
+  if (jevResult.remaining.length === 0) {
+    return jevResult.rules;
+  }
+  if (remainingSlots <= 0) {
+    throw new Error(
+      `AI提案は一度に${MAX_BATCH_LLM_RULES}件のルールまでです。対象を減らして再実行してください。`,
+    );
   }
 
-  return rules;
+  try {
+    const geminiRules = await suggestBatchMatcherRulesWithGemini(
+      jevResult.remaining,
+      accountItems,
+      taxCodes,
+      remainingSlots,
+    );
+    return [...jevResult.rules, ...geminiRules];
+  } catch (error) {
+    if (jevResult.rules.length > 0) {
+      return jevResult.rules;
+    }
+    throw error;
+  }
 }
 
 export function batchLlmRulesToDrafts(

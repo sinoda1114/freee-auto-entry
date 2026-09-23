@@ -43,6 +43,17 @@ describe("matcher batch llm suggestion", () => {
     expect(prompt).toContain("id=2");
   });
 
+  it("asks Gemini for at most the leftover rule budget", () => {
+    const prompt = buildMatcherBatchLlmPrompt(
+      transactions,
+      accountItems,
+      taxCodes,
+      2,
+    );
+    expect(prompt).toContain("up to 2");
+    expect(prompt).not.toContain("up to 10");
+  });
+
   it("validates grouped rules against masters and transaction ids", () => {
     const rules = validateMatcherBatchLlmRules(
       {
