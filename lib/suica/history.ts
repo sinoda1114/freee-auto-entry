@@ -249,12 +249,15 @@ export function buildSuicaExpenseUrl(
   return `${base}/expenses/suica?p=${p}`;
 }
 
-/** 旅費交通費っぽい勘定科目を優先して選ぶ */
+/**
+ * 旅費交通費っぽい勘定科目を選ぶ。該当が無ければ null を返す
+ * （無関係な科目を既定選択して誤仕訳を招かないよう、先頭科目へのフォールバックはしない）。
+ */
 export function pickTravelAccountItemId(
   accountItems: Array<{ id: number; name: string }>,
 ): number | null {
   const preferred = accountItems.find((item) =>
     /旅費|交通費|電車|乗車券/.test(item.name),
   );
-  return preferred?.id ?? accountItems[0]?.id ?? null;
+  return preferred?.id ?? null;
 }
