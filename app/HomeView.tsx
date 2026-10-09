@@ -181,17 +181,7 @@ export function HomeDashboard({
           {message}
         </p>
       ) : null}
-      <div className="flex flex-col gap-5">
-        <WorkflowGroup title="経理" domain="accounting" items={accounting} />
-        <WorkflowGroup title="請求" domain="billing" items={billingWorkflows} />
-        <WorkflowGroup
-          title="問い合わせ"
-          domain="support"
-          items={supportWorkflows}
-        />
-      </div>
-
-      <section className="panel mt-5 px-3 py-3">
+      <section className="panel px-3 py-3">
         <p className="text-xs font-semibold text-[var(--freee-text)]">
           クイックアクション
         </p>
@@ -220,6 +210,15 @@ export function HomeDashboard({
           </Button>
         </div>
       </section>
+      <div className="mt-5 flex flex-col gap-5">
+        <WorkflowGroup title="経理" domain="accounting" items={accounting} />
+        <WorkflowGroup title="請求" domain="billing" items={billingWorkflows} />
+        <WorkflowGroup
+          title="問い合わせ"
+          domain="support"
+          items={supportWorkflows}
+        />
+      </div>
     </>
   );
 }

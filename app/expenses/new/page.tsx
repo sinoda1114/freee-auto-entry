@@ -2,6 +2,10 @@ import { AuthGate } from "@/app/components/AuthGate";
 import { getAccountItems, getTaxCodes } from "@/lib/freee/accounting";
 import { isExpenseCompany } from "@/lib/freee/company-policy";
 import {
+  listRecentRegisteredExpenses,
+  type RecentExpense,
+} from "@/lib/freee/recent-expenses";
+import {
   getConnectedCompanies,
   getValidFreeeAuth,
 } from "@/lib/freee/session-client";
@@ -35,11 +39,21 @@ export default async function NewExpensePage() {
     getTaxCodes(auth),
   ]);
 
+  let recentExpenses: RecentExpense[] = [];
+  let recentExpensesUnavailable = false;
+  try {
+    recentExpenses = await listRecentRegisteredExpenses(auth, accountItems);
+  } catch {
+    recentExpensesUnavailable = true;
+  }
+
   return (
     <ExpensePageView
       companyId={auth.companyId}
       accountItems={accountItems}
       taxCodes={taxCodes}
+      recentExpenses={recentExpenses}
+      recentExpensesUnavailable={recentExpensesUnavailable}
     />
   );
 }

@@ -29,6 +29,16 @@ test.describe("経費（領収書）E2E", () => {
     await expect(
       page.getByRole("link", { name: /経費（領収書OCR）/ }),
     ).toBeVisible();
+    const quickBox = await page.getByText("クイックアクション").boundingBox();
+    const accountingBox = await page
+      .getByRole("heading", { name: "経理" })
+      .boundingBox();
+    expect(quickBox).not.toBeNull();
+    expect(accountingBox).not.toBeNull();
+    if (!quickBox || !accountingBox) {
+      throw new Error("クイックアクションまたは経理の位置が取れません。");
+    }
+    expect(quickBox.y).toBeLessThan(accountingBox.y);
     await expect(
       page.getByText("経費は対応事業所選択時のみ"),
     ).toHaveCount(0);
@@ -48,6 +58,11 @@ test.describe("経費（領収書）E2E", () => {
     await expect(
       page.getByText("登録すると、出金元口座は役員資金で決済します。"),
     ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "最近登録した経費" }),
+    ).toBeVisible();
+    await expect(page.getByText("文房具")).toBeVisible();
+    await expect(page.getByText("¥1,280")).toBeVisible();
     await expect(page.getByText("経費登録は対応事業所のみ利用できます")).toHaveCount(
       0,
     );
