@@ -22,7 +22,7 @@
     "ai": "^5.0.0",
     "framer-motion": "^12.23.24",
     "iron-session": "8.0.4",
-    "next": "16.3.6",
+    "next": "16.4.0",
     "next-themes": "^0.4.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -41,12 +41,12 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "6.0.3",
     "eslint": "^9",
-    "eslint-config-next": "16.3.6",
+    "eslint-config-next": "16.4.0",
     "jsdom": "29.1.1",
     "tailwindcss": "^4",
     "typescript": "7.0.2",
     "typescript-6-eslint": "npm:typescript@6.0.3",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   },
   "overrides": {
     "browserslist": "4.29.0",
