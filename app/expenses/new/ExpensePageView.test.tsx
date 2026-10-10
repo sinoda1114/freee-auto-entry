@@ -1,5 +1,5 @@
 import { HeroUIProvider } from "@heroui/react";
-import { fireEvent, render, screen, waitFor } from "@/test/test-utils";
+import { act, fireEvent, render, screen, waitFor } from "@/test/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ExpensePageView } from "./ExpensePageView";
 
@@ -16,6 +16,48 @@ vi.mock("@/lib/ui/notify", () => ({
 
 const accountItems = [{ id: 10, name: "消耗品費", defaultTaxCode: 136 }];
 const taxCodes = [{ code: 136, name: "課対仕入10%" }];
+
+function pageFor(companyId: string) {
+  return (
+    <HeroUIProvider>
+      <ExpensePageView
+        companyId={companyId}
+        accountItems={accountItems}
+        taxCodes={taxCodes}
+        recentExpenses={[]}
+        recentExpensesUnavailable={false}
+      />
+    </HeroUIProvider>
+  );
+}
+
+function registeredResult() {
+  return {
+    status: "success" as const,
+    dealId: 9000,
+    message: "役員資金で決済まで登録しました。",
+    registeredExpense: {
+      id: 9000,
+      issueDate: "2020-01-01",
+      amount: 880,
+      description: "遡及の備品",
+      accountItemName: "消耗品費",
+    },
+  };
+}
+
+function deferRegistration() {
+  let finish: (result: ReturnType<typeof registeredResult>) => void = () => {};
+  createExpenseActionMock.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  return (result: ReturnType<typeof registeredResult>) => {
+    finish(result);
+  };
+}
 
 function renderPage(
   recentExpenses: Array<{
@@ -174,5 +216,41 @@ describe("ExpensePageView recent expenses", () => {
 
     expect(screen.queryByText("2020-01-01")).not.toBeInTheDocument();
     expect(screen.getByText("まだ登録した経費はありません。")).toBeInTheDocument();
+  });
+
+  it("does not list a registration that finishes after the company changes", async () => {
+    localStorage.setItem(
+      "expense.accountItems.recent.11122591",
+      JSON.stringify([10]),
+    );
+    const finishRegistration = deferRegistration();
+    const view = renderPage([]);
+    fireEvent.click(await screen.findByRole("button", { name: "消耗品費" }));
+    fireEvent.change(screen.getByLabelText("発生日"), {
+      target: { value: "2020-01-01" },
+    });
+    fireEvent.change(screen.getByLabelText("金額（円）"), {
+      target: { value: "880" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "登録する" }));
+    await waitFor(() => {
+      expect(createExpenseActionMock).toHaveBeenCalledTimes(1);
+    });
+
+    view.rerender(pageFor("11040830"));
+    await act(async () => {
+      finishRegistration(registeredResult());
+    });
+
+    expect(screen.queryByText("2020-01-01")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "最近使った" }),
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem("expense.accountItems.recent.11122591")).toBe(
+      JSON.stringify([10]),
+    );
+    expect(
+      localStorage.getItem("expense.accountItems.recent.11040830"),
+    ).toBeNull();
   });
 });
