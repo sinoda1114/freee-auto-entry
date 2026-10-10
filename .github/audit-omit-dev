@@ -1,0 +1,5 @@
+# このファイルがあると、標準 CI は本番依存だけを監査する。
+# npm は npm audit --omit=dev、pnpm は pnpm audit --prod。
+# high 以上で落とす方針と .github/audit-allowlist の扱いは変えない。
+# braces（GHSA-vfj7-8cjw-p6xm）は eslint-config-next 経由の開発依存なので対象外。
+# eslint-config-next のダウングレードはしない。

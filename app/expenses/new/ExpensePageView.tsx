@@ -1,23 +1,101 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@heroui/react";
 import NextLink from "next/link";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
 import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
 import { ExpenseForm } from "./ExpenseForm";
+import {
+  mergeRecentExpenses,
+  type RecentExpenseRow,
+} from "@/lib/expenses/recent-expense-list";
 
 interface ExpensePageViewProps {
   companyId: string;
   accountItems: AccountItem[];
   taxCodes: TaxCode[];
+  recentExpenses: RecentExpenseRow[];
+  recentExpensesUnavailable: boolean;
+}
+
+function yen(amount: number): string {
+  return `¥${amount.toLocaleString("ja-JP")}`;
+}
+
+function RecentExpenses({
+  expenses,
+  unavailable,
+}: {
+  expenses: RecentExpenseRow[];
+  unavailable: boolean;
+}) {
+  return (
+    <section className="panel mt-4 px-4 py-3" aria-labelledby="recent-expenses-heading">
+      <h2
+        id="recent-expenses-heading"
+        className="text-xs font-semibold text-[var(--freee-text)]"
+      >
+        最近登録した経費
+      </h2>
+      {unavailable ? (
+        <p className="mt-2 text-sm text-[var(--freee-text-muted)]">
+          直近の経費を表示できませんでした。
+        </p>
+      ) : expenses.length === 0 ? (
+        <p className="mt-2 text-sm text-[var(--freee-text-muted)]">
+          まだ登録した経費はありません。
+        </p>
+      ) : (
+        <ul className="mt-2 flex flex-col gap-2">
+          {expenses.map((expense) => {
+            const detail = [
+              expense.accountItemName,
+              expense.description ?? "摘要なし",
+            ]
+              .filter((part): part is string => Boolean(part))
+              .join(" · ");
+            return (
+              <li
+                key={expense.id}
+                className="border-t border-[var(--freee-border)] pt-2 first:border-t-0 first:pt-0"
+              >
+                <p className="flex items-baseline justify-between gap-3 text-sm text-[var(--freee-text)]">
+                  <span>{expense.issueDate}</span>
+                  <span className="font-semibold">{yen(expense.amount)}</span>
+                </p>
+                <p className="truncate text-xs text-[var(--freee-text-muted)]">
+                  {detail}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 export function ExpensePageView({
   companyId,
   accountItems,
   taxCodes,
+  recentExpenses,
+  recentExpensesUnavailable,
 }: ExpensePageViewProps) {
+  const [trackedCompanyId, setTrackedCompanyId] = useState(companyId);
+  const [justRegistered, setJustRegistered] = useState<RecentExpenseRow[]>([]);
+  if (trackedCompanyId !== companyId) {
+    setTrackedCompanyId(companyId);
+    setJustRegistered([]);
+  }
+  const expenses = mergeRecentExpenses(
+    recentExpensesUnavailable ? [] : recentExpenses,
+    justRegistered,
+  );
+  const showUnavailable = recentExpensesUnavailable && expenses.length === 0;
+
   return (
     <PageShell width="md">
       <Button
@@ -43,11 +121,15 @@ export function ExpensePageView({
         </NextLink>
         で CSV 取り込み（または Android でかざし）できます。こちらも役員資金で決済します。
       </p>
+      <RecentExpenses expenses={expenses} unavailable={showUnavailable} />
       <div className="panel mt-4 px-4 py-4">
         <ExpenseForm
           companyId={companyId}
           accountItems={accountItems}
           taxCodes={taxCodes}
+          onRegistered={(expense) => {
+            setJustRegistered((current) => [...current, expense]);
+          }}
         />
       </div>
     </PageShell>

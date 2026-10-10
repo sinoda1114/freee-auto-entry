@@ -33,6 +33,34 @@ describe("HomeDashboard", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("places quick actions above the workflow groups", () => {
+    render(<HomeDashboard canRegisterExpense />);
+
+    const quickActions = screen.getByText("クイックアクション");
+    const accounting = screen.getByRole("heading", { name: "経理" });
+    const billing = screen.getByRole("heading", { name: "請求" });
+    const support = screen.getByRole("heading", { name: "問い合わせ" });
+
+    expect(
+      quickActions.compareDocumentPosition(accounting) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      accounting.compareDocumentPosition(billing) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      billing.compareDocumentPosition(support) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "経費を撮影・登録" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "請求書を作成" }),
+    ).toBeInTheDocument();
+  });
+
   it("shows expense quick action when expense registration is allowed", () => {
     render(<HomeDashboard canRegisterExpense />);
 

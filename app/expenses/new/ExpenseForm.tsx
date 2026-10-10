@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useTransition,
@@ -26,6 +27,7 @@ import {
   resolveAccountItemsByIds,
   toggleFavoriteAccountItemId,
 } from "@/lib/expenses/account-item-prefs";
+import type { RecentExpenseRow } from "@/lib/expenses/recent-expense-list";
 
 const initialState: ExpenseFormState = { status: "idle" };
 
@@ -40,10 +42,12 @@ export function ExpenseForm({
   companyId,
   accountItems,
   taxCodes,
+  onRegistered,
 }: {
   companyId: string;
   accountItems: AccountItem[];
   taxCodes: TaxCode[];
+  onRegistered?: (expense: RecentExpenseRow) => void;
 }) {
   const [state, setState] = useState<ExpenseFormState>(initialState);
   const [isPending, startSubmitTransition] = useTransition();
@@ -68,9 +72,16 @@ export function ExpenseForm({
   const [recentIds, setRecentIds] = useState<number[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<number[]>([]);
 
+  const companyEpochRef = useRef(0);
+  const ocrRequestIdRef = useRef(0);
+  // 会社切替の commit 後、完了の microtask より前に世代を進める。
+  // 一度戻した会社でも、送信時の世代と違えば今の入力は触らない。
+  useLayoutEffect(() => {
+    companyEpochRef.current += 1;
+    ocrRequestIdRef.current += 1;
+  }, [companyId]);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-  const ocrRequestIdRef = useRef(0);
   const selectedFileRef = useRef<File | null>(null);
   const successRef = useRef<HTMLDivElement>(null);
   const dragDepthRef = useRef(0);
@@ -82,10 +93,14 @@ export function ExpenseForm({
   }, [previewUrl]);
 
   useEffect(() => {
-    // SSR と初回 HTML を一致させ、マウント後だけ localStorage を読む
+    // SSR と初回 HTML を一致させ、マウント後だけ localStorage を読む。
+    // 会社が変わったあとの入力・成功表示は、遅れて返る登録完了では消さない。
     // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only prefs hydration
     setRecentIds(loadRecentAccountItemIds(companyId));
     setFavoriteIds(loadFavoriteAccountItemIds(companyId));
+    setLastSuccessDealId(null);
+    setState(initialState);
+    resetFormFields();
   }, [companyId]);
 
   const favoriteItems = resolveAccountItemsByIds(accountItems, favoriteIds);
@@ -269,14 +284,43 @@ export function ExpenseForm({
 
   function handleSubmit(formData: FormData) {
     const submittedAccountItemId = Number(formData.get("accountItemId"));
+    const submittedCompanyId = companyId;
+    const submittedEpoch = companyEpochRef.current;
     startSubmitTransition(async () => {
       const result = await createExpenseAction(state, formData);
+      const sameCompany = companyEpochRef.current === submittedEpoch;
+      if (!sameCompany) {
+        if (result.status === "success" && result.dealId) {
+          if (
+            Number.isFinite(submittedAccountItemId) &&
+            submittedAccountItemId > 0
+          ) {
+            recordRecentAccountItemId(
+              submittedCompanyId,
+              submittedAccountItemId,
+            );
+          }
+          notifySuccess(
+            "登録しました",
+            "事業所を切り替えたため、直前の登録はこの画面の一覧に足していません。",
+          );
+        } else if (result.status === "error") {
+          notifyError("登録できませんでした", result.message);
+        }
+        return;
+      }
       setState(result);
       if (result.status === "success" && result.dealId) {
         if (Number.isFinite(submittedAccountItemId) && submittedAccountItemId > 0) {
           setRecentIds(
-            recordRecentAccountItemId(companyId, submittedAccountItemId),
+            recordRecentAccountItemId(
+              submittedCompanyId,
+              submittedAccountItemId,
+            ),
           );
+        }
+        if (result.registeredExpense) {
+          onRegistered?.(result.registeredExpense);
         }
         setLastSuccessDealId(result.dealId);
         notifySuccess(
