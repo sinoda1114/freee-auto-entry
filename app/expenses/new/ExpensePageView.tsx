@@ -1,19 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@heroui/react";
 import NextLink from "next/link";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
 import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
 import { ExpenseForm } from "./ExpenseForm";
-
-interface RecentExpenseRow {
-  id: number;
-  issueDate: string;
-  amount: number;
-  description: string | null;
-  accountItemName: string | null;
-}
+import {
+  mergeRecentExpenses,
+  type RecentExpenseRow,
+} from "@/lib/expenses/recent-expense-list";
 
 interface ExpensePageViewProps {
   companyId: string;
@@ -87,6 +84,18 @@ export function ExpensePageView({
   recentExpenses,
   recentExpensesUnavailable,
 }: ExpensePageViewProps) {
+  const [trackedCompanyId, setTrackedCompanyId] = useState(companyId);
+  const [justRegistered, setJustRegistered] = useState<RecentExpenseRow[]>([]);
+  if (trackedCompanyId !== companyId) {
+    setTrackedCompanyId(companyId);
+    setJustRegistered([]);
+  }
+  const expenses = mergeRecentExpenses(
+    recentExpensesUnavailable ? [] : recentExpenses,
+    justRegistered,
+  );
+  const showUnavailable = recentExpensesUnavailable && expenses.length === 0;
+
   return (
     <PageShell width="md">
       <Button
@@ -112,15 +121,15 @@ export function ExpensePageView({
         </NextLink>
         で CSV 取り込み（または Android でかざし）できます。こちらも役員資金で決済します。
       </p>
-      <RecentExpenses
-        expenses={recentExpenses}
-        unavailable={recentExpensesUnavailable}
-      />
+      <RecentExpenses expenses={expenses} unavailable={showUnavailable} />
       <div className="panel mt-4 px-4 py-4">
         <ExpenseForm
           companyId={companyId}
           accountItems={accountItems}
           taxCodes={taxCodes}
+          onRegistered={(expense) => {
+            setJustRegistered((current) => [...current, expense]);
+          }}
         />
       </div>
     </PageShell>

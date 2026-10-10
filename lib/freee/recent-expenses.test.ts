@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { APP_MEMO_TAG_NAME } from "./memo-tag";
 import {
   listRecentRegisteredExpenses,
-  planDealPageOffsets,
   RECENT_EXPENSE_LIMIT,
   selectRecentDeals,
 } from "./recent-expenses";
@@ -15,6 +14,7 @@ const accountItems = [
 
 function deal(input: {
   id: number;
+  issueDate?: string;
   amount?: number;
   description?: string | null;
   accountItemId?: number;
@@ -29,50 +29,19 @@ function deal(input: {
   }
   return {
     id: input.id,
-    issue_date: "2026-10-01",
+    issue_date: input.issueDate ?? "2026-10-01",
     amount: input.amount ?? input.id * 100,
     details: [detail],
   };
 }
 
+function dealOffset(url: unknown): number {
+  return Number(new URL(String(url)).searchParams.get("offset"));
+}
+
 function jsonResponse(body: unknown) {
   return { ok: true, json: async () => body };
 }
-
-describe("planDealPageOffsets", () => {
-  it("stays on the first page when every deal fits", () => {
-    expect(
-      planDealPageOffsets({
-        firstPageIds: [1, 2, 3],
-        totalCount: 3,
-        pageSize: 100,
-        maxPages: 8,
-      }),
-    ).toEqual([0]);
-  });
-
-  it("walks backward from the last page when ids ascend", () => {
-    expect(
-      planDealPageOffsets({
-        firstPageIds: [1, 100],
-        totalCount: 250,
-        pageSize: 100,
-        maxPages: 8,
-      }),
-    ).toEqual([200, 100, 0]);
-  });
-
-  it("walks forward when the first page is already newest-first", () => {
-    expect(
-      planDealPageOffsets({
-        firstPageIds: [300, 201],
-        totalCount: 300,
-        pageSize: 100,
-        maxPages: 2,
-      }),
-    ).toEqual([0, 100]);
-  });
-});
 
 describe("selectRecentDeals", () => {
   it("keeps the five newest deals that carry the app tag", () => {
@@ -153,7 +122,7 @@ describe("listRecentRegisteredExpenses", () => {
     );
   });
 
-  it("reads the newest pages when freee returns oldest deals first", async () => {
+  it("reads every issue_date page and ranks tagged deals by id", async () => {
     vi.stubEnv("E2E_TEST_MODE", "");
     const firstPage = Array.from({ length: 100 }, (_, index) =>
       deal({ id: index + 1, tagIds: [] }),
@@ -161,35 +130,165 @@ describe("listRecentRegisteredExpenses", () => {
     const middlePage = [
       deal({ id: 150, description: "中間", tagIds: [7] }),
       deal({ id: 160, description: "中間2", tagIds: [7] }),
+      ...Array.from({ length: 98 }, (_, index) =>
+        deal({ id: 10000 + index, tagIds: [] }),
+      ),
     ];
     const lastPage = [
       deal({ id: 210, description: "新しい", tagIds: [7], accountItemId: 11 }),
       deal({ id: 220, description: "より新しい", tagIds: [] }),
       deal({ id: 230, description: "最新", tagIds: [7] }),
     ];
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse({ tags: [{ id: 7, name: APP_MEMO_TAG_NAME }] }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({ deals: firstPage, meta: { total_count: 250 } }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({ deals: lastPage, meta: { total_count: 250 } }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({ deals: middlePage, meta: { total_count: 250 } }),
-      );
+    const pages = new Map<number, unknown[]>([
+      [0, firstPage],
+      [100, middlePage],
+      [200, lastPage],
+    ]);
+    const fetchMock = vi.fn(async (url: unknown) => {
+      const href = String(url);
+      if (href.includes("/tags")) {
+        return jsonResponse({ tags: [{ id: 7, name: APP_MEMO_TAG_NAME }] });
+      }
+      const offset = dealOffset(url);
+      return jsonResponse({
+        deals: pages.get(offset) ?? [],
+        meta: { total_count: 250 },
+      });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const rows = await listRecentRegisteredExpenses(auth, accountItems);
 
     expect(rows.map((row) => row.id)).toEqual([230, 210, 160, 150]);
     expect(rows[1]?.accountItemName).toBe("旅費交通費");
-    expect(String(fetchMock.mock.calls[2]?.[0])).toContain("offset=200");
-    expect(String(fetchMock.mock.calls[3]?.[0])).toContain("offset=100");
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const dealCalls = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((href) => href.includes("/deals"));
+    expect(dealCalls.map(dealOffset)).toEqual([0, 100, 200]);
+  });
+
+  it("keeps a backdated registration on the first page when later pages already have five tagged deals", async () => {
+    vi.stubEnv("E2E_TEST_MODE", "");
+    const firstPage = [
+      ...Array.from({ length: 99 }, (_, index) =>
+        deal({ id: index + 1, tagIds: [] }),
+      ),
+      deal({
+        id: 9000,
+        issueDate: "2020-01-01",
+        description: "遡及の備品",
+        tagIds: [7],
+      }),
+    ];
+    const lastPage = [200, 201, 202, 203, 204].map((id) =>
+      deal({
+        id,
+        issueDate: "2026-10-09",
+        description: `新しい${id}`,
+        tagIds: [7],
+      }),
+    );
+    const fetchMock = vi.fn(async (url: unknown) => {
+      const href = String(url);
+      if (href.includes("/tags")) {
+        return jsonResponse({ tags: [{ id: 7, name: APP_MEMO_TAG_NAME }] });
+      }
+      const offset = dealOffset(url);
+      if (offset === 0) {
+        return jsonResponse({
+          deals: firstPage,
+          meta: { total_count: 250 },
+        });
+      }
+      if (offset === 200) {
+        return jsonResponse({
+          deals: lastPage,
+          meta: { total_count: 250 },
+        });
+      }
+      return jsonResponse({
+        deals: Array.from({ length: 100 }, (_, index) =>
+          deal({ id: 1000 + offset + index, tagIds: [] }),
+        ),
+        meta: { total_count: 250 },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const rows = await listRecentRegisteredExpenses(auth, accountItems);
+
+    expect(rows.map((row) => row.id)).toEqual([9000, 204, 203, 202, 201]);
+    expect(rows[0]).toMatchObject({
+      issueDate: "2020-01-01",
+      description: "遡及の備品",
+    });
+    const dealCalls = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((href) => href.includes("/deals"));
+    expect(dealCalls.map(dealOffset)).toEqual([0, 100, 200]);
+  });
+
+  it("still reads past the first pages when page 0 ids look newest-first", async () => {
+    vi.stubEnv("E2E_TEST_MODE", "");
+    const totalCount = 1100;
+    const fetchMock = vi.fn(async (url: unknown) => {
+      const href = String(url);
+      if (href.includes("/tags")) {
+        return jsonResponse({ tags: [{ id: 7, name: APP_MEMO_TAG_NAME }] });
+      }
+      const offset = dealOffset(url);
+      if (offset === 0) {
+        return jsonResponse({
+          deals: [
+            deal({
+              id: 500,
+              issueDate: "2026-10-09",
+              description: "先頭",
+              tagIds: [7],
+            }),
+            ...Array.from({ length: 98 }, (_, index) =>
+              deal({ id: 400 - index, tagIds: [] }),
+            ),
+            deal({ id: 100, tagIds: [] }),
+          ],
+          meta: { total_count: totalCount },
+        });
+      }
+      if (offset === 1000) {
+        return jsonResponse({
+          deals: [
+            deal({
+              id: 99999,
+              issueDate: "2020-01-01",
+              description: "窓の外だった遡及",
+              tagIds: [7],
+            }),
+          ],
+          meta: { total_count: totalCount },
+        });
+      }
+      return jsonResponse({
+        deals: Array.from({ length: 100 }, (_, index) =>
+          deal({ id: offset + index + 1, tagIds: [] }),
+        ),
+        meta: { total_count: totalCount },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const rows = await listRecentRegisteredExpenses(auth, accountItems);
+
+    expect(rows.map((row) => row.id)).toEqual([99999, 500]);
+    expect(rows[0]).toMatchObject({
+      issueDate: "2020-01-01",
+      description: "窓の外だった遡及",
+    });
+    const offsets = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((href) => href.includes("/deals"))
+      .map(dealOffset);
+    expect(offsets[0]).toBe(0);
+    expect(offsets).toContain(1000);
   });
 
   it("does not list expenses that are missing the app memo tag", async () => {

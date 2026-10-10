@@ -1,20 +1,18 @@
+import { isE2ETestMode } from "@/lib/e2e/fixtures";
+import {
+  RECENT_EXPENSE_LIMIT,
+  type RecentExpenseRow,
+} from "@/lib/expenses/recent-expense-list";
 import type { AccountItem, FreeeAuth } from "@/lib/freee/accounting";
 import { findAppMemoTagId } from "@/lib/freee/memo-tag";
-import { isE2ETestMode } from "@/lib/e2e/fixtures";
+
+export { RECENT_EXPENSE_LIMIT };
+export type { RecentExpenseRow as RecentExpense } from "@/lib/expenses/recent-expense-list";
 
 const ACCOUNTING_API_BASE = "https://api.freee.co.jp/api/1";
 const DEAL_PAGE_SIZE = 100;
-const MAX_PAGES = 8;
-
-export const RECENT_EXPENSE_LIMIT = 5;
-
-export interface RecentExpense {
-  id: number;
-  issueDate: string;
-  amount: number;
-  description: string | null;
-  accountItemName: string | null;
-}
+/** Suica の取引走査と同じ上限。これを超える取引は直近 5 件の対象外にする。 */
+const MAX_PAGES = 30;
 
 interface ListedDeal {
   id: number;
@@ -30,7 +28,7 @@ interface DealPage {
   totalCount: number;
 }
 
-const e2eRecentExpenses: RecentExpense[] = [
+const e2eRecentExpenses: RecentExpenseRow[] = [
   {
     id: 503,
     issueDate: "2026-10-08",
@@ -56,41 +54,6 @@ const e2eRecentExpenses: RecentExpense[] = [
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-/**
- * GET /api/1/deals に並び順もアプリ絞り込みもない。
- * 請求一覧と同じく古い順とみて末尾ページから読み、先頭ページの id が降順なら新しい順として先頭から読む。
- */
-export function planDealPageOffsets(input: {
-  firstPageIds: number[];
-  totalCount: number;
-  pageSize: number;
-  maxPages: number;
-}): number[] {
-  const { firstPageIds, totalCount, pageSize, maxPages } = input;
-  if (totalCount <= pageSize) {
-    return [0];
-  }
-
-  const newestFirst =
-    firstPageIds.length >= 2 &&
-    firstPageIds[0]! > firstPageIds[firstPageIds.length - 1]!;
-  const start = newestFirst
-    ? 0
-    : Math.floor((totalCount - 1) / pageSize) * pageSize;
-  const step = newestFirst ? pageSize : -pageSize;
-  const offsets: number[] = [];
-
-  for (let index = 0; index < maxPages; index += 1) {
-    const offset = start + index * step;
-    if (offset < 0 || offset >= totalCount) {
-      break;
-    }
-    offsets.push(offset);
-  }
-
-  return offsets.length > 0 ? offsets : [0];
 }
 
 export function selectRecentDeals(
@@ -202,7 +165,7 @@ async function fetchDealPage(auth: FreeeAuth, offset: number): Promise<DealPage>
 function toRecentExpenses(
   deals: ListedDeal[],
   accountItems: AccountItem[],
-): RecentExpense[] {
+): RecentExpenseRow[] {
   const names = new Map(accountItems.map((item) => [item.id, item.name]));
   return deals.map((deal) => ({
     id: deal.id,
@@ -219,7 +182,7 @@ function toRecentExpenses(
 export async function listRecentRegisteredExpenses(
   auth: FreeeAuth,
   accountItems: AccountItem[],
-): Promise<RecentExpense[]> {
+): Promise<RecentExpenseRow[]> {
   if (isE2ETestMode()) {
     return e2eRecentExpenses;
   }
@@ -229,22 +192,20 @@ export async function listRecentRegisteredExpenses(
     return [];
   }
 
-  const firstPage = await fetchDealPage(auth, 0);
-  const offsets = planDealPageOffsets({
-    firstPageIds: firstPage.deals.map((deal) => deal.id),
-    totalCount: firstPage.totalCount,
-    pageSize: DEAL_PAGE_SIZE,
-    maxPages: MAX_PAGES,
-  });
-
+  // GET /api/1/deals は id 順ではない（issue_date 順）。
+  // 先頭ページの id で走査方向を決めると、発生日が古い新規登録が窓の外に残る。
   const collected: ListedDeal[] = [];
-  for (const offset of offsets) {
-    const page = offset === 0 ? firstPage : await fetchDealPage(auth, offset);
-    collected.push(...page.deals);
-    if (
-      selectRecentDeals(collected, tagId, RECENT_EXPENSE_LIMIT).length >=
-      RECENT_EXPENSE_LIMIT
-    ) {
+  let totalCount = Number.POSITIVE_INFINITY;
+
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const offset = page * DEAL_PAGE_SIZE;
+    if (offset >= totalCount) {
+      break;
+    }
+    const result = await fetchDealPage(auth, offset);
+    totalCount = result.totalCount;
+    collected.push(...result.deals);
+    if (result.deals.length < DEAL_PAGE_SIZE) {
       break;
     }
   }

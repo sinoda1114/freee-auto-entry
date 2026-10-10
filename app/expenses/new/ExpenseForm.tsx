@@ -26,6 +26,7 @@ import {
   resolveAccountItemsByIds,
   toggleFavoriteAccountItemId,
 } from "@/lib/expenses/account-item-prefs";
+import type { RecentExpenseRow } from "@/lib/expenses/recent-expense-list";
 
 const initialState: ExpenseFormState = { status: "idle" };
 
@@ -40,10 +41,12 @@ export function ExpenseForm({
   companyId,
   accountItems,
   taxCodes,
+  onRegistered,
 }: {
   companyId: string;
   accountItems: AccountItem[];
   taxCodes: TaxCode[];
+  onRegistered?: (expense: RecentExpenseRow) => void;
 }) {
   const [state, setState] = useState<ExpenseFormState>(initialState);
   const [isPending, startSubmitTransition] = useTransition();
@@ -277,6 +280,9 @@ export function ExpenseForm({
           setRecentIds(
             recordRecentAccountItemId(companyId, submittedAccountItemId),
           );
+        }
+        if (result.registeredExpense) {
+          onRegistered?.(result.registeredExpense);
         }
         setLastSuccessDealId(result.dealId);
         notifySuccess(

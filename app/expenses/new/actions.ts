@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { extractReceiptOcr, type OcrResult } from "@/lib/ai/receipt-ocr";
 import {
   createDeal,
@@ -7,6 +8,7 @@ import {
   getTaxCodes,
 } from "@/lib/freee/accounting";
 import { resolveOfficerFundsPayment } from "@/lib/expenses/officer-funds";
+import type { RecentExpenseRow } from "@/lib/expenses/recent-expense-list";
 import { getAppMemoTagId } from "@/lib/freee/memo-tag";
 import { uploadReceipt } from "@/lib/freee/receipts";
 import { getValidFreeeAuth } from "@/lib/freee/session-client";
@@ -15,6 +17,7 @@ export interface ExpenseFormState {
   status: "idle" | "success" | "error";
   message?: string;
   dealId?: number;
+  registeredExpense?: RecentExpenseRow;
 }
 
 export interface OcrActionResult {
@@ -114,10 +117,21 @@ export async function createExpenseAction(
       payment: officerFunds.payment,
     });
 
+    revalidatePath("/expenses/new");
+
+    const trimmedDescription = description.trim();
     return {
       status: "success",
       dealId: deal.id,
       message: "役員資金で決済まで登録しました。",
+      registeredExpense: {
+        id: deal.id,
+        issueDate,
+        amount,
+        description: trimmedDescription || null,
+        accountItemName:
+          accountItems.find((item) => item.id === accountItemId)?.name ?? null,
+      },
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "不明なエラーです。";
