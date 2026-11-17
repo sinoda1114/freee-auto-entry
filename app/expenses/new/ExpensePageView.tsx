@@ -141,9 +141,17 @@ export function ExpensePageView({
 }: ExpensePageViewProps) {
   const [trackedCompanyId, setTrackedCompanyId] = useState(companyId);
   const [justRegistered, setJustRegistered] = useState<RecentExpenseRow[]>([]);
+  const [promiseRevision, setPromiseRevision] = useState(0);
+  const [lastPromise, setLastPromise] = useState(recentExpenses);
+  
   if (trackedCompanyId !== companyId) {
     setTrackedCompanyId(companyId);
     setJustRegistered([]);
+  }
+  
+  if (lastPromise !== recentExpenses) {
+    setLastPromise(recentExpenses);
+    setPromiseRevision((rev) => rev + 1);
   }
 
   return (
@@ -172,6 +180,7 @@ export function ExpensePageView({
         で CSV 取り込み（または Android でかざし）できます。こちらも役員資金で決済します。
       </p>
       <Suspense
+        key={`${trackedCompanyId}-${promiseRevision}`}
         fallback={<RecentExpensesFallback justRegistered={justRegistered} />}
       >
         <RecentExpensesFromPromise
