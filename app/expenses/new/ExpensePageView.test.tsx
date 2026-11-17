@@ -1,7 +1,11 @@
 import { HeroUIProvider } from "@heroui/react";
 import { act, fireEvent, render, screen, waitFor } from "@/test/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ExpensePageView } from "./ExpensePageView";
+import type { RecentExpenseRow } from "@/lib/expenses/recent-expense-list";
+import {
+  ExpensePageView,
+  type RecentExpensesLoad,
+} from "./ExpensePageView";
 
 const createExpenseActionMock = vi.fn();
 
@@ -17,6 +21,13 @@ vi.mock("@/lib/ui/notify", () => ({
 const accountItems = [{ id: 10, name: "消耗品費", defaultTaxCode: 136 }];
 const taxCodes = [{ code: 136, name: "課対仕入10%" }];
 
+function load(
+  rows: RecentExpenseRow[],
+  unavailable = false,
+): Promise<RecentExpensesLoad> {
+  return Promise.resolve({ rows, unavailable });
+}
+
 function pageFor(companyId: string) {
   return (
     <HeroUIProvider>
@@ -24,8 +35,7 @@ function pageFor(companyId: string) {
         companyId={companyId}
         accountItems={accountItems}
         taxCodes={taxCodes}
-        recentExpenses={[]}
-        recentExpensesUnavailable={false}
+        recentExpenses={load([])}
       />
     </HeroUIProvider>
   );
@@ -59,25 +69,25 @@ function deferRegistration() {
   };
 }
 
-function renderPage(
-  recentExpenses: Array<{
-    id: number;
-    issueDate: string;
-    amount: number;
-    description: string | null;
-    accountItemName: string | null;
-  }>,
+async function renderPage(
+  recentExpenses: RecentExpenseRow[],
   recentExpensesUnavailable = false,
 ) {
-  return render(
-    <ExpensePageView
-      companyId="11122591"
-      accountItems={accountItems}
-      taxCodes={taxCodes}
-      recentExpenses={recentExpenses}
-      recentExpensesUnavailable={recentExpensesUnavailable}
-    />,
-  );
+  let view: ReturnType<typeof render> | undefined;
+  await act(async () => {
+    view = render(
+      <ExpensePageView
+        companyId="11122591"
+        accountItems={accountItems}
+        taxCodes={taxCodes}
+        recentExpenses={load(recentExpenses, recentExpensesUnavailable)}
+      />,
+    );
+  });
+  if (!view) {
+    throw new Error("render did not return a view");
+  }
+  return view;
 }
 
 describe("ExpensePageView recent expenses", () => {
@@ -87,8 +97,8 @@ describe("ExpensePageView recent expenses", () => {
     Element.prototype.scrollIntoView = () => {};
   });
 
-  it("shows an empty message when nothing has been registered", () => {
-    renderPage([]);
+  it("shows an empty message when nothing has been registered", async () => {
+    await renderPage([]);
 
     expect(
       screen.getByRole("heading", { name: "最近登録した経費" }),
@@ -97,8 +107,8 @@ describe("ExpensePageView recent expenses", () => {
     expect(screen.getByRole("heading", { name: "経費を登録" })).toBeInTheDocument();
   });
 
-  it("shows fewer than five registered expenses with date, amount, account, and description", () => {
-    renderPage([
+  it("shows fewer than five registered expenses with date, amount, account, and description", async () => {
+    await renderPage([
       {
         id: 3,
         issueDate: "2026-10-08",
@@ -124,8 +134,8 @@ describe("ExpensePageView recent expenses", () => {
     expect(screen.queryByText("まだ登録した経費はありません。")).not.toBeInTheDocument();
   });
 
-  it("shows a short failure message without hiding the registration form", () => {
-    renderPage([], true);
+  it("shows a short failure message without hiding the registration form", async () => {
+    await renderPage([], true);
 
     expect(screen.getByText("直近の経費を表示できませんでした。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "登録する" })).toBeInTheDocument();
@@ -148,7 +158,7 @@ describe("ExpensePageView recent expenses", () => {
         accountItemName: "消耗品費",
       },
     });
-    renderPage([]);
+    await renderPage([]);
 
     const accountChip = await screen.findByRole("button", { name: "消耗品費" });
     fireEvent.click(accountChip);
@@ -191,7 +201,7 @@ describe("ExpensePageView recent expenses", () => {
         accountItemName: "消耗品費",
       },
     });
-    const view = renderPage([]);
+    const view = await renderPage([]);
     fireEvent.click(await screen.findByRole("button", { name: "消耗品費" }));
     fireEvent.change(screen.getByLabelText("発生日"), {
       target: { value: "2020-01-01" },
@@ -202,17 +212,18 @@ describe("ExpensePageView recent expenses", () => {
     fireEvent.click(screen.getByRole("button", { name: "登録する" }));
     expect(await screen.findByText("遡及の備品", { exact: false })).toBeInTheDocument();
 
-    view.rerender(
-      <HeroUIProvider>
-        <ExpensePageView
-          companyId="11040830"
-          accountItems={accountItems}
-          taxCodes={taxCodes}
-          recentExpenses={[]}
-          recentExpensesUnavailable={false}
-        />
-      </HeroUIProvider>,
-    );
+    await act(async () => {
+      view.rerender(
+        <HeroUIProvider>
+          <ExpensePageView
+            companyId="11040830"
+            accountItems={accountItems}
+            taxCodes={taxCodes}
+            recentExpenses={load([])}
+          />
+        </HeroUIProvider>,
+      );
+    });
 
     expect(screen.queryByText("2020-01-01")).not.toBeInTheDocument();
     expect(screen.getByText("まだ登録した経費はありません。")).toBeInTheDocument();
@@ -224,7 +235,7 @@ describe("ExpensePageView recent expenses", () => {
       JSON.stringify([10]),
     );
     const finishRegistration = deferRegistration();
-    const view = renderPage([]);
+    const view = await renderPage([]);
     fireEvent.click(await screen.findByRole("button", { name: "消耗品費" }));
     fireEvent.change(screen.getByLabelText("発生日"), {
       target: { value: "2020-01-01" },
@@ -237,7 +248,9 @@ describe("ExpensePageView recent expenses", () => {
       expect(createExpenseActionMock).toHaveBeenCalledTimes(1);
     });
 
-    view.rerender(pageFor("11040830"));
+    await act(async () => {
+      view.rerender(pageFor("11040830"));
+    });
     await act(async () => {
       finishRegistration(registeredResult());
     });
@@ -252,5 +265,75 @@ describe("ExpensePageView recent expenses", () => {
     expect(
       localStorage.getItem("expense.accountItems.recent.11040830"),
     ).toBeNull();
+  });
+
+  it("shows the registration form while the recent list is still loading", async () => {
+    let resolveList: (value: RecentExpensesLoad) => void = () => {};
+    const promise = new Promise<RecentExpensesLoad>((resolve) => {
+      resolveList = resolve;
+    });
+    localStorage.setItem(
+      "expense.accountItems.recent.11122591",
+      JSON.stringify([10]),
+    );
+    createExpenseActionMock.mockResolvedValue({
+      status: "success",
+      dealId: 9000,
+      message: "役員資金で決済まで登録しました。",
+      registeredExpense: {
+        id: 9000,
+        issueDate: "2020-01-01",
+        amount: 880,
+        description: "遡及の備品",
+        accountItemName: "消耗品費",
+      },
+    });
+
+    render(
+      <ExpensePageView
+        companyId="11122591"
+        accountItems={accountItems}
+        taxCodes={taxCodes}
+        recentExpenses={promise}
+      />,
+    );
+
+    expect(screen.getByText("読み込み中…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "登録する" })).toBeInTheDocument();
+    expect(
+      screen.queryByText("まだ登録した経費はありません。"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole("button", { name: "消耗品費" }));
+    fireEvent.change(screen.getByLabelText("発生日"), {
+      target: { value: "2020-01-01" },
+    });
+    fireEvent.change(screen.getByLabelText("金額（円）"), {
+      target: { value: "880" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "登録する" }));
+
+    expect(
+      await screen.findByText("消耗品費 · 遡及の備品"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("読み込み中…")).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveList({
+        rows: [
+          {
+            id: 3,
+            issueDate: "2026-10-08",
+            amount: 1280,
+            description: "文房具",
+            accountItemName: "消耗品費",
+          },
+        ],
+        unavailable: false,
+      });
+    });
+
+    expect(await screen.findByText("消耗品費 · 文房具")).toBeInTheDocument();
+    expect(screen.getByText("消耗品費 · 遡及の備品")).toBeInTheDocument();
   });
 });
