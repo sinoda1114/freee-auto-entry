@@ -1,23 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, use, useState } from "react";
 import { Button } from "@heroui/react";
 import NextLink from "next/link";
 import { PageHeader } from "@/app/components/PageHeader";
 import { PageShell } from "@/app/components/PageShell";
 import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
-import { ExpenseForm } from "./ExpenseForm";
 import {
   mergeRecentExpenses,
   type RecentExpenseRow,
 } from "@/lib/expenses/recent-expense-list";
+import { ExpenseForm } from "./ExpenseForm";
+
+export interface RecentExpensesLoad {
+  rows: RecentExpenseRow[];
+  unavailable: boolean;
+}
+
+type RecentExpensesStatus = "pending" | "unavailable" | "ready";
 
 interface ExpensePageViewProps {
   companyId: string;
   accountItems: AccountItem[];
   taxCodes: TaxCode[];
-  recentExpenses: RecentExpenseRow[];
-  recentExpensesUnavailable: boolean;
+  recentExpenses: Promise<RecentExpensesLoad>;
+}
+
+function presentRecentExpenses(
+  loaded: RecentExpensesLoad | null,
+  justRegistered: readonly RecentExpenseRow[],
+): { expenses: RecentExpenseRow[]; status: RecentExpensesStatus } {
+  if (loaded === null) {
+    const expenses = mergeRecentExpenses([], justRegistered);
+    return {
+      expenses,
+      status: expenses.length > 0 ? "ready" : "pending",
+    };
+  }
+
+  const expenses = mergeRecentExpenses(
+    loaded.unavailable ? [] : loaded.rows,
+    justRegistered,
+  );
+  return {
+    expenses,
+    status:
+      loaded.unavailable && expenses.length === 0 ? "unavailable" : "ready",
+  };
 }
 
 function yen(amount: number): string {
@@ -26,20 +55,26 @@ function yen(amount: number): string {
 
 function RecentExpenses({
   expenses,
-  unavailable,
+  status,
 }: {
   expenses: RecentExpenseRow[];
-  unavailable: boolean;
+  status: RecentExpensesStatus;
 }) {
   return (
-    <section className="panel mt-4 px-4 py-3" aria-labelledby="recent-expenses-heading">
+    <section
+      className="panel mt-4 px-4 py-3"
+      aria-labelledby="recent-expenses-heading"
+      aria-busy={status === "pending" ? true : undefined}
+    >
       <h2
         id="recent-expenses-heading"
         className="text-xs font-semibold text-[var(--freee-text)]"
       >
         最近登録した経費
       </h2>
-      {unavailable ? (
+      {status === "pending" ? (
+        <p className="mt-2 text-sm text-[var(--freee-text-muted)]">読み込み中…</p>
+      ) : status === "unavailable" ? (
         <p className="mt-2 text-sm text-[var(--freee-text-muted)]">
           直近の経費を表示できませんでした。
         </p>
@@ -77,12 +112,32 @@ function RecentExpenses({
   );
 }
 
+function RecentExpensesFallback({
+  justRegistered,
+}: {
+  justRegistered: readonly RecentExpenseRow[];
+}) {
+  const view = presentRecentExpenses(null, justRegistered);
+  return <RecentExpenses expenses={view.expenses} status={view.status} />;
+}
+
+function RecentExpensesFromPromise({
+  promise,
+  justRegistered,
+}: {
+  promise: Promise<RecentExpensesLoad>;
+  justRegistered: readonly RecentExpenseRow[];
+}) {
+  const loaded = use(promise);
+  const view = presentRecentExpenses(loaded, justRegistered);
+  return <RecentExpenses expenses={view.expenses} status={view.status} />;
+}
+
 export function ExpensePageView({
   companyId,
   accountItems,
   taxCodes,
   recentExpenses,
-  recentExpensesUnavailable,
 }: ExpensePageViewProps) {
   const [trackedCompanyId, setTrackedCompanyId] = useState(companyId);
   const [justRegistered, setJustRegistered] = useState<RecentExpenseRow[]>([]);
@@ -90,11 +145,6 @@ export function ExpensePageView({
     setTrackedCompanyId(companyId);
     setJustRegistered([]);
   }
-  const expenses = mergeRecentExpenses(
-    recentExpensesUnavailable ? [] : recentExpenses,
-    justRegistered,
-  );
-  const showUnavailable = recentExpensesUnavailable && expenses.length === 0;
 
   return (
     <PageShell width="md">
@@ -121,7 +171,14 @@ export function ExpensePageView({
         </NextLink>
         で CSV 取り込み（または Android でかざし）できます。こちらも役員資金で決済します。
       </p>
-      <RecentExpenses expenses={expenses} unavailable={showUnavailable} />
+      <Suspense
+        fallback={<RecentExpensesFallback justRegistered={justRegistered} />}
+      >
+        <RecentExpensesFromPromise
+          promise={recentExpenses}
+          justRegistered={justRegistered}
+        />
+      </Suspense>
       <div className="panel mt-4 px-4 py-4">
         <ExpenseForm
           companyId={companyId}

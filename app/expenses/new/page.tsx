@@ -1,15 +1,31 @@
 import { AuthGate } from "@/app/components/AuthGate";
-import { getAccountItems, getTaxCodes } from "@/lib/freee/accounting";
-import { isExpenseCompany } from "@/lib/freee/company-policy";
 import {
-  listRecentRegisteredExpenses,
-  type RecentExpense,
-} from "@/lib/freee/recent-expenses";
+  getAccountItems,
+  getTaxCodes,
+  type AccountItem,
+  type FreeeAuth,
+} from "@/lib/freee/accounting";
+import { isExpenseCompany } from "@/lib/freee/company-policy";
+import { listRecentRegisteredExpenses } from "@/lib/freee/recent-expenses";
 import {
   getConnectedCompanies,
   getValidFreeeAuth,
 } from "@/lib/freee/session-client";
-import { ExpenseBlockedView, ExpensePageView } from "./ExpensePageView";
+import {
+  ExpenseBlockedView,
+  ExpensePageView,
+  type RecentExpensesLoad,
+} from "./ExpensePageView";
+
+function loadRecentExpenses(
+  auth: FreeeAuth,
+  accountItems: AccountItem[],
+): Promise<RecentExpensesLoad> {
+  return listRecentRegisteredExpenses(auth, accountItems).then(
+    (rows) => ({ rows, unavailable: false }),
+    () => ({ rows: [], unavailable: true }),
+  );
+}
 
 export default async function NewExpensePage() {
   const auth = await getValidFreeeAuth();
@@ -39,21 +55,12 @@ export default async function NewExpensePage() {
     getTaxCodes(auth),
   ]);
 
-  let recentExpenses: RecentExpense[] = [];
-  let recentExpensesUnavailable = false;
-  try {
-    recentExpenses = await listRecentRegisteredExpenses(auth, accountItems);
-  } catch {
-    recentExpensesUnavailable = true;
-  }
-
   return (
     <ExpensePageView
       companyId={auth.companyId}
       accountItems={accountItems}
       taxCodes={taxCodes}
-      recentExpenses={recentExpenses}
-      recentExpensesUnavailable={recentExpensesUnavailable}
+      recentExpenses={loadRecentExpenses(auth, accountItems)}
     />
   );
 }
