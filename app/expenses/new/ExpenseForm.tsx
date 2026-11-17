@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
@@ -12,6 +13,12 @@ import { Autocomplete, AutocompleteItem, Button, Skeleton, Spinner } from "@hero
 import type { AccountItem, TaxCode } from "@/lib/freee/accounting";
 import type { OcrResult } from "@/lib/ai/receipt-ocr";
 import { ProcessingStatus } from "@/app/components/ProcessingStatus";
+import {
+  fileFromClipboard,
+  isTextEditingTarget,
+  unsupportedReceiptMessage,
+  type ReceiptInputSource,
+} from "@/lib/receipts/clipboard-receipt";
 import { prepareReceiptFileForUpload } from "@/lib/receipts/prepare-receipt-file";
 import { isImageFile, isReceiptDropFile } from "@/lib/receipts/receipt-file";
 import { notifyError, notifySuccess } from "@/lib/ui/notify";
@@ -237,15 +244,37 @@ export function ExpenseForm({
     runOcr(file);
   }
 
-  function handleDroppedFile(file: File | undefined) {
+  function acceptReceiptFile(
+    file: File | undefined,
+    source: ReceiptInputSource,
+  ) {
     if (!file) return;
     if (!isReceiptDropFile(file)) {
-      setOcrError("画像またはPDFをドロップしてください。");
-      notifyError("このファイルは使えません", "画像またはPDFをドロップしてください。");
+      const message = unsupportedReceiptMessage(source);
+      setOcrError(message);
+      notifyError("このファイルは使えません", message);
       return;
     }
     handleFileSelected(file);
   }
+
+  const acceptPastedReceipt = useEffectEvent((file: File) => {
+    acceptReceiptFile(file, "paste");
+  });
+
+  useEffect(() => {
+    // 入力欄にフォーカスがある貼り付けは、ブラウザの文字入力に任せる。
+    function onPaste(event: ClipboardEvent) {
+      if (isTextEditingTarget(event.target)) return;
+      const file = fileFromClipboard(event.clipboardData);
+      if (!file) return;
+      event.preventDefault();
+      acceptPastedReceipt(file);
+    }
+
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, []);
 
   function handleDragEnter(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -270,7 +299,7 @@ export function ExpenseForm({
     event.preventDefault();
     dragDepthRef.current = 0;
     setIsDragging(false);
-    handleDroppedFile(event.dataTransfer.files[0]);
+    acceptReceiptFile(event.dataTransfer.files[0], "drop");
   }
 
   function handleRetryOcr() {
@@ -479,22 +508,6 @@ export function ExpenseForm({
               <ProcessingStatus label="勘定科目・金額などを解析しています…" />
             ) : null}
 
-            {ocrError ? (
-              <div className="flex flex-col gap-2">
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {ocrError}
-                </p>
-                <button
-                  type="button"
-                  disabled={isOcrPending}
-                  onClick={handleRetryOcr}
-                  className="w-fit text-sm text-zinc-600 underline hover:text-zinc-800 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-200"
-                >
-                  再読み取り
-                </button>
-              </div>
-            ) : null}
-
             {ocrDone && !ocrError ? (
               <div className="flex flex-col gap-1.5">
                 <div className="flex flex-wrap items-center gap-3">
@@ -516,12 +529,30 @@ export function ExpenseForm({
             ) : null}
           </div>
         ) : (
-          <p className="text-xs text-zinc-500 dark:text-zinc-500">
-            {isDragging
-              ? "ここにドロップして読み取ります。"
-              : "撮影・選択、または写真をドラッグして読み取ります。大きな写真は自動で圧縮します（目安 3.5MB 以下）。"}
-          </p>
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-zinc-500 dark:text-zinc-500">
+              {isDragging
+                ? "ここにドロップして読み取ります。"
+                : "撮影・選択、Ctrl+V / ⌘V での貼り付け、またはドラッグで読み取ります。大きな写真は自動で圧縮します（目安 3.5MB 以下）。"}
+            </p>
+          </div>
         )}
+
+        {ocrError ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-red-600 dark:text-red-400">{ocrError}</p>
+            {selectedFile ? (
+              <button
+                type="button"
+                disabled={isOcrPending}
+                onClick={handleRetryOcr}
+                className="w-fit text-sm text-zinc-600 underline hover:text-zinc-800 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-zinc-200"
+              >
+                再読み取り
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         {receiptId ? (
           <input type="hidden" name="receiptId" value={receiptId} />
