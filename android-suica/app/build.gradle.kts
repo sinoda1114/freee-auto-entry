@@ -15,9 +15,12 @@ android {
         versionName = "0.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // 本番デフォルト。ローカル検証時は -PSITE_URL=http://10.0.2.2:3000 などで上書き
-        val siteUrl = (project.findProperty("SITE_URL") as String?)
-            ?: "https://freee-auto-entry.vercel.app"
+        // SITE_URL は gradle.properties（設定）で管理する。build ロジックには
+        // URL をハードコードしない。ローカル検証時は -PSITE_URL=http://10.0.2.2:3000 で上書き。
+        val siteUrl = (project.findProperty("SITE_URL") as String?)?.trim().orEmpty()
+        require(siteUrl.isNotEmpty()) {
+            "SITE_URL が未設定です。gradle.properties に SITE_URL を設定するか -PSITE_URL=... を指定してください。"
+        }
         buildConfigField("String", "SITE_URL", "\"$siteUrl\"")
     }
 
